@@ -2,11 +2,13 @@ const update_status = Object.freeze({"UPDATE_CONTINUE":1, "UPDATE_STOP":2, "UPDA
 
 const App = {
 
-    modules : {},
+    modules : [],
     modulesLenght : Number(0),
     modulesIndex : Number(0),
     Init : function(){
         var retInit = true;
+        this.modules.push(ModuleWindow)
+        retInit = this.StartModules();
         return retInit;
     },
     StartModules : function(){
@@ -45,6 +47,5 @@ const App = {
         }
         modulesIndex = 0;
         return retCleanUp;
-    }
-
+    },
 };
