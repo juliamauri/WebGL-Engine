@@ -5,9 +5,11 @@ const App = {
     modules : [],
     modulesLenght : Number(0),
     modulesIndex : Number(0),
+    window : Number(0),
     Init : function(){
         var retInit = true;
-        this.modules.push(ModuleWindow)
+        this.modules.push(ModuleWindow);
+        window = 0;
         retInit = this.StartModules();
         return retInit;
     },

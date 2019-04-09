@@ -1,7 +1,9 @@
 const ModuleWindow ={
-
+    wWidht : 0,
+    wHeight : 0,
     Init : function(){
         var ret = true;
+
         return ret;
     },
     PreUpdate : function(){
@@ -14,6 +16,7 @@ const ModuleWindow ={
         return update_status.UPDATE_CONTINUE;
     },
     CleanUp : function(){
+        var ret = true;
         return ret;
-    }
+    },
 };

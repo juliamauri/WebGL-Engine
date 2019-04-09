@@ -11,10 +11,14 @@
         <script type="text/javascript">
         const main_states = Object.freeze({"MAIN_START":0, "MAIN_UPDATE":1, "MAIN_FINISH":2, "MAIN_EXIT":3})
         var mainState = main_states.MAIN_START;
+
         var TickUpdate = setInterval(Tick, 1000);
             function Tick(){
                 if(mainState == main_states.MAIN_UPDATE){
-                    mainState = App.Update();
+                    {
+                        mainState = App.Update();
+                        console.log("Window W: " + App.modules[App.window].wWidht);
+                    }
                     if(mainState  == main_states.MAIN_EXIT){
                         console.log("MAIN UPDATE Failed");
                         clearInterval(TickUpdate);
@@ -31,8 +35,17 @@
             }
             function main() {
                 console.log("Main Start");
+
+
+                var canvas = document.getElementById("webGL-canvas");
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                console.log(canvas.width);
+                console.log(canvas.height);
+
                 if(App.Init())
-                {
+                {                 
                     mainState = main_states.MAIN_UPDATE;
                     console.log("Total Modules: " + App.modules.length);
                     console.log("Main Update");
