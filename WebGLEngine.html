@@ -3,6 +3,26 @@
         <title>WebGL Engine</title>
         <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
+
+        <script type="text/javascript">
+        var canvas;
+        var gl;
+        function SetCanvas(){
+            canvas = document.getElementById("webGL-canvas");
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        function InitGL(){
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        };
+        function GetCanvas(){
+            return canvas;
+        };
+        </script>
+
+
         <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
         <script type="text/javascript" src="webgl-utils.js"></script>
         <script type="text/javascript" src="Window.js"></script>
@@ -36,13 +56,10 @@
             function main() {
                 console.log("Main Start");
 
+                SetCanvas();
+                InitGL();
 
-                var canvas = document.getElementById("webGL-canvas");
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-
-                console.log(canvas.width);
-                console.log(canvas.height);
+                console.log(GetCanvas().height);
 
                 if(App.Init())
                 {                 

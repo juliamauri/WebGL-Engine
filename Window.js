@@ -3,7 +3,8 @@ const ModuleWindow ={
     wHeight : 0,
     Init : function(){
         var ret = true;
-
+        wHeight = GetCanvas().height;
+        wWidht = GetCanvas().width;
         return ret;
     },
     PreUpdate : function(){
