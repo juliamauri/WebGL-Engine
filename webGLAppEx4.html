@@ -327,7 +327,7 @@
                     dist += 0.5;
                 if(event.deltaY > 0)
                     dist -= 0.5;
-                translate_camera[2] += dist;
+                translate_camera[2] = dist;
                 recalculate_camera = true;
             }
 
@@ -370,8 +370,8 @@
                 var deltaY = newY - lastMouseY;
 
                 if(wheelDown){
-                    translate_camera[0] += deltaX;
-                    translate_camera[1] += deltaY;  
+                    translate_camera[0] -= deltaX * 0.005;
+                    translate_camera[1] += deltaY * 0.005;  
                     console.log("panning");  
                     console.log(deltaX);                    
                     console.log(deltaY);                
