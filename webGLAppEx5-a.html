@@ -23,7 +23,7 @@
             uniform vec3 color;
 
             void main(void) {
-                gl_FragColor = vec4(1.0, 1.0, 1.0,1.0);
+                gl_FragColor = vec4(color,1.0);
             }
         </script>
 
@@ -147,6 +147,7 @@
                 shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
                 shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
                 shaderProgram.colorUniform = gl.getUniformLocation(shaderProgram, "color");
+                
                 //precalculating variables that will never change
                 mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
@@ -156,7 +157,6 @@
             //models
             var modelVertexPositionBuffer;
             var modelVertexIndexBuffer;
-            var modelVertexColorBuffer;
 
             function handleLoadedModel(modelData){
                 modelVertexPositionBuffer = gl.createBuffer();
@@ -167,7 +167,7 @@
 
                 modelVertexIndexBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, modelVertexIndexBuffer);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(modelData.indices), gl.STATIC_DRAW);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(modelData.indices), gl.STATIC_DRAW);
                 modelVertexIndexBuffer.itemSize = 1;
                 modelVertexIndexBuffer.numItems = modelData.indices.length;
             }
@@ -183,38 +183,19 @@
                 request.send();
             }
 
-            //textures
-            var marvelTexture;
-
-            function setTextureParams(texture){
-                gl.bindTexture(gl.TEXTURE_2D, texture);
-                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.bindTexture(gl.TEXTURE_2D, null);
-            }
-
-            function loadTextureOnGPU() {
-                marvelTexture = gl.createTexture();
-                marvelTexture.image = new Image();
-                marvelTexture.image.onload = function () {
-                    setTextureParams(marvelTexture);
-                }
-                marvelTexture.image.src = "textures/marvel.png";
-            }
-
             function drawScene() {
                 gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
                 if(modelVertexPositionBuffer)
                 { 
-                    mat4.translate(mvMatrix, [0.0, 0.0, -5.0]);
+                    mat4.translate(mvMatrix, [0.0, 0.0, -10.0]);
+                    mat4.scale(mvMatrix, [0.25,0.25,0.25]);
                     gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexPositionBuffer);
                     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
                                             modelVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-
+                    var color = [ 1.0, 0.5, 0.1];
+                    gl.uniform3fv(shaderProgram.colorUniform, color);
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, modelVertexIndexBuffer);
                     sendMatricesToShader();
                     gl.drawElements(gl.TRIANGLES, modelVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
@@ -354,8 +335,6 @@
                 initShaders();
 
                 loadModel();
-
-                loadTextureOnGPU();
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
                 gl.enable(gl.DEPTH_TEST);
