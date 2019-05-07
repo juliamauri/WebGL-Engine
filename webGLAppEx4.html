@@ -338,10 +338,10 @@
             var wheelDown = false;
             var leftDown = false;
             function handleMouseDown(event){
+                event.preventDefault();
                 mouseDown = true;
                 if(event.button == 1){
                     wheelDown = true;
-                    console.log("wheel down");
                 }
                 if(event.button == 2){
                     leftDown = true;
@@ -353,7 +353,6 @@
                 mouseDown = false;
                 if(event.button == 1){
                     wheelDown = false;
-                    console.log("wheel up");
                 }
                 if(event.button == 2){
                     leftDown = false;
@@ -370,11 +369,8 @@
                 var deltaY = newY - lastMouseY;
 
                 if(wheelDown){
-                    translate_camera[0] += deltaX;
-                    translate_camera[1] += deltaY;  
-                    console.log("panning");  
-                    console.log(deltaX);                    
-                    console.log(deltaY);                
+                    translate_camera[0] += deltaX * 0.05;
+                    translate_camera[1] += deltaY * 0.05;     
                     recalculate_camera = true;
                 }
 
