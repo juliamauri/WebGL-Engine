@@ -20,7 +20,7 @@
                 texCoords = aTextureCoords;
             }
         </script>
-        
+
         <script id="shader-fs" type="x-shader/x-fragment">
             precision mediump float;
 
@@ -31,7 +31,7 @@
                 gl_FragColor = texture2D(texture, texCoords);
             }
         </script>
-        
+
         <script type="text/javascript">
 
             var gl;
@@ -81,7 +81,7 @@
 
                 return shader;
             }
-                        
+
             //Matrices
             var mvMatrixStack = []; //store view of camera
             var mvMatrix = mat4.create(); //model view
@@ -158,7 +158,7 @@
                 //precalculating variables that will never change
                 gl.uniform1i(shaderProgram.samplerUniform, 0);
                 mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
-                
+
                 recalculate_camera = true;
             }
 
@@ -175,7 +175,7 @@
                 gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
                 var verticesTriangle = [
                     0.0,  1.0, 0.0,
-                    1.0, -1.0, 0.0,  
+                    1.0, -1.0, 0.0,
                     -1.0, -1.0, 0.0,
                 ];
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verticesTriangle), gl.STATIC_DRAW);
@@ -200,7 +200,7 @@
                     // first triangle
                     1.0,  1.0, 0.0,  // top right
                     1.0, -1.0, 0.0,  // bottom right
-                    -1.0,  1.0, 0.0,  // top left 
+                    -1.0,  1.0, 0.0,  // top left
                     // second triangle
                     1.0, -1.0, 0.0,  // bottom right
                     -1.0, -1.0, 0.0,  // bottom left
@@ -283,7 +283,7 @@
             function handleKeyDown(event){
                 if (event.defaultPrevented) {
                     return; // Do nothing if the event was already processed
-                }  
+                }
 
                 switch (event.key) {
                     case "Down": // IE/Edge specific value
@@ -317,8 +317,8 @@
                 }
 
                 // Cancel the default action to avoid it being handled twice
-                event.preventDefault();          
-            }   
+                event.preventDefault();
+            }
 
                 //mouse wheel
             function handleWheel(event){
@@ -327,11 +327,11 @@
                     dist += 0.5;
                 if(event.deltaY > 0)
                     dist -= 0.5;
-                translate_camera[2] += dist;
+                translate_camera[2] = dist;
                 recalculate_camera = true;
             }
 
-                //mouse 
+                //mouse
             var lastMouseX = null;
             var lastMouseY = null;
             var mouseDown = false;
@@ -369,8 +369,8 @@
                 var deltaY = newY - lastMouseY;
 
                 if(wheelDown){
-                    translate_camera[0] += deltaX * 0.05;
-                    translate_camera[1] += deltaY * 0.05;     
+                    translate_camera[0] += deltaX * 0.005;
+                    translate_camera[1] += deltaY * 0.005;
                     recalculate_camera = true;
                 }
 
@@ -424,7 +424,7 @@
     </head>
 
     <body onload="webGLStart();" onresize="webGLStart();">
-        <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>    
+        <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
     </body>
 
 </html>
