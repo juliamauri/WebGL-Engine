@@ -124,7 +124,7 @@
             function ResetCamera(){
                 dist = 0;
                 mat4.identity(mouseRotationMatrix);
-                translate_camera = [0,0,0];
+                translate_camera = [0.0,0.0,0.0];
                 recalculate_camera = true;
             }
 
@@ -341,6 +341,7 @@
                 mouseDown = true;
                 if(event.button == 1){
                     wheelDown = true;
+                    console.log("wheel down");
                 }
                 if(event.button == 2){
                     leftDown = true;
@@ -352,6 +353,7 @@
                 mouseDown = false;
                 if(event.button == 1){
                     wheelDown = false;
+                    console.log("wheel up");
                 }
                 if(event.button == 2){
                     leftDown = false;
@@ -369,7 +371,11 @@
 
                 if(wheelDown){
                     translate_camera[0] += deltaX;
-                    translate_camera[1] += deltaY;
+                    translate_camera[1] += deltaY;  
+                    console.log("panning");  
+                    console.log(deltaX);                    
+                    console.log(deltaY);                
+                    recalculate_camera = true;
                 }
 
                 if(leftDown){
