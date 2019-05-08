@@ -35,7 +35,7 @@
             varying vec3 normalEye;
             varying vec4 positionEye;
 
-            const vec3 lightPositionEye = vec3(-1.0, 3.0, 0.0);
+            const vec3 lightPositionEye = vec3(0.0, 10.0, 0.0);
 
             void main(void) {
                 vec3 L = normalize(lightPositionEye - positionEye.xyz);
@@ -189,9 +189,9 @@
 
                 //pearl
                 var defLight = new light();
-                defLight.Ia = [0.25, 0.20725, 0.20725];
-                defLight.Id = [1.0, 0.829, 0.829];
-                defLight.Is = [0.296648, 0.296648, 0.296648];
+                defLight.Ia = [1.0, 1.0, 1.0];
+                defLight.Id = [1.0, 1.0, 1.0];
+                defLight.Is = [0.2, 0.2, 0.2];
 
                 gl.uniform3fv(shaderProgram.Ia_Uniform, defLight.Ia);
                 gl.uniform3fv(shaderProgram.Id_Uniform, defLight.Id);
@@ -310,7 +310,6 @@
                         gl.uniform3fv(shaderProgram.Kd_Uniform, modelsLoaded[i].material.Kd);
                         gl.uniform3fv(shaderProgram.Ks_Uniform, modelsLoaded[i].material.Ks);
                         gl.uniform1f(shaderProgram.shininess_Uniform, modelsLoaded[i].material.shininess);
-
 
                         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, modelsLoaded[i].VertexIndexBuffer);
                         sendMatricesToShader();
