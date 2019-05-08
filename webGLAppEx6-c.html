@@ -1,0 +1,507 @@
+<html>
+    <head>
+        <title>WebGL Application</title>
+        <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+        <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+        <script type="text/javascript" src="webgl-utils.js"></script>
+
+        <script id="shader-vs" type="x-shader/x-vertex">
+            attribute vec3 aVertexPosition;
+            attribute vec3 aVertexNormal;
+
+            uniform mat4 uMVMatrix;
+            uniform mat4 uPMatrix;
+            uniform mat3 uNMatrix;
+
+            varying vec3 normalEye;
+            varying vec4 positionEye;
+
+            void main(void) {
+                normalEye = normalize(uNMatrix * aVertexNormal);
+                positionEye = uMVMatrix * vec4(aVertexPosition, 1.0);
+
+                gl_Position = uPMatrix * positionEye;
+            }
+        </script>
+
+        <script id="shader-fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            uniform vec3 Ia, Id, Is; //light color
+            uniform vec3 Ka, Kd, Ks; //material color
+            uniform float shiniess; //material color
+
+            varying vec3 normalEye;
+            varying vec4 positionEye;
+
+            const vec3 lightPositionEye = vec3(-1.0, 3.0, 0.0);
+
+            void main(void) {
+                vec3 L = normalize(lightPositionEye - positionEye.xyz);
+                vec3 N = normalize(normalEye);
+                vec3 V = normalize(-positionEye.xyz);
+
+                float NdotL = max(dot(N, L), 0.0);
+
+                vec3 R = reflect(-L, N);
+                float RdotV = pow(max(dot(R, V), 0.0), shiniess);
+
+                vec3 shadedColor = Ka * Id * NdotL + Ks * Is * RdotV;
+                gl_FragColor = vec4(shadedColor,1.0);
+            }
+        </script>
+
+        <script type="text/javascript">
+
+            var gl;
+            function initGL(canvas) {
+                try {
+                    gl = canvas.getContext("experimental-webgl");
+                    gl.viewportWidth = canvas.width;
+                    gl.viewportHeight = canvas.height;
+                } catch (e) {
+                }
+                if (!gl) {
+                    alert("Could not initialise WebGL, sorry :-(");
+                }
+            }
+
+            function getShader(id) {
+                var shaderScript = document.getElementById(id);
+                if (!shaderScript) {
+                    return null;
+                }
+
+                var str = "";
+                var k = shaderScript.firstChild;
+                while (k) {
+                    if (k.nodeType == 3) {
+                        str += k.textContent;
+                    }
+                    k = k.nextSibling;
+                }
+
+                var shader;
+                if (shaderScript.type == "x-shader/x-fragment") {
+                    shader = gl.createShader(gl.FRAGMENT_SHADER);
+                } else if (shaderScript.type == "x-shader/x-vertex") {
+                    shader = gl.createShader(gl.VERTEX_SHADER);
+                } else {
+                    return null;
+                }
+
+                gl.shaderSource(shader, str);
+                gl.compileShader(shader);
+
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    alert(gl.getShaderInfoLog(shader));
+                    return null;
+                }
+            
+                return shader;
+            }
+
+            //Matrices
+            var mvMatrixStack = []; //store view of camera
+            var mvMatrix = mat4.create(); //model view
+            var pMatrix = mat4.create(); //projection
+
+            function mvPushMatrix(){
+                var copy = mat4.create();
+                mat4.set(mvMatrix, copy);
+                mvMatrixStack.push(copy);
+            }
+
+            function mvPopMatrix(){
+                if(mvMatrixStack.length > 0){
+                    mvMatrix = mvMatrixStack.pop();
+                }
+            }
+
+            //degtorad
+            function deg2Rad(angle){
+                return angle * Math.PI / 180
+            }
+
+            //Camera values
+            var recalculate_camera = false;
+            var dist = 0;
+            var translate_camera = [ 0, 0, 0];
+            var mouseRotationMatrix = mat4.create();
+            mat4.identity(mouseRotationMatrix);
+
+            function calculateCamera(){
+                mvPopMatrix();
+                mat4.identity(mvMatrix);
+                mat4.translate(mvMatrix, translate_camera);
+                mat4.multiply(mvMatrix, mouseRotationMatrix);
+                mvPushMatrix();
+                recalculate_camera = false;
+            }
+
+            //function key associated
+            function ResetCamera(){
+                dist = 0;
+                mat4.identity(mouseRotationMatrix);
+                translate_camera = [0.0,0.0,0.0];
+                recalculate_camera = true;
+            }
+
+            //shaders
+            var shaderProgram;
+
+            function initShaders() {
+                var fragmentShader = getShader("shader-fs");
+                var vertexShader = getShader("shader-vs");
+
+                shaderProgram = gl.createProgram();
+                gl.attachShader(shaderProgram, vertexShader);
+                gl.attachShader(shaderProgram, fragmentShader);
+                gl.linkProgram(shaderProgram);
+
+                if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                    alert("Could not initialise shaders");
+                }
+
+                gl.useProgram(shaderProgram);
+
+                shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+                gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+                shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+                gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
+                shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+                shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+                shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
+
+                shaderProgram.Ia_Uniform = gl.getUniformLocation(shaderProgram, "Ia");
+                shaderProgram.Id_Uniform = gl.getUniformLocation(shaderProgram, "Id");
+                shaderProgram.Is_Uniform = gl.getUniformLocation(shaderProgram, "Is");
+
+                shaderProgram.Ka_Uniform = gl.getUniformLocation(shaderProgram, "Ka");
+                shaderProgram.Kd_Uniform = gl.getUniformLocation(shaderProgram, "Kd");
+                shaderProgram.Ks_Uniform = gl.getUniformLocation(shaderProgram, "Ks");
+                shaderProgram.shininess_Uniform = gl.getUniformLocation(shaderProgram, "shininess");
+
+                //precalculating variables that will never change
+                mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+                //pearl
+                var defLight = new light();
+                defLight.Ia = [0.25, 0.20725, 0.20725];
+                defLight.Id = [1.0, 0.829, 0.829];
+                defLight.Is = [0.296648, 0.296648, 0.296648];
+
+                gl.uniform3fv(shaderProgram.Ia_Uniform, defLight.Ia);
+                gl.uniform3fv(shaderProgram.Id_Uniform, defLight.Id);
+                gl.uniform3fv(shaderProgram.Is_Uniform, defLight.Is);
+
+                recalculate_camera = true;
+            }
+
+            function sendMatricesToShader() {
+                gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+                gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+
+                var normalMatrix = mat3.create();
+                mat4.toInverseMat3(mvMatrix, normalMatrix);
+                mat3.transpose(normalMatrix);
+                gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
+            }
+
+            //light
+            function light(){
+                this.Ia = [0.0,0.0,0.0];
+                this.Id = [0.0,0.0,0.0];
+                this.Is = [0.0,0.0,0.0];
+            }
+
+
+            //material
+            function material(){
+                this.Ka = [1.0,0.3,0.0]; //material ambient
+                this.Kd = [1.0,0.3,0.0]; //material diffuse
+                this.Ks = [1.0,0.3,0.0]; //material shininess
+                this.shininess = 1.0;
+            }
+
+            //Transform
+            function transform(){
+                this.position = [0,0,0];
+                this.rotateAngle = 0;
+                this.rotateVector = [0,0,0];
+                this.scale = [1,1,1];
+                this.modelMatrix = mat4.create();
+                mat4.identity(this.modelMatrix);
+                this.CalcualteModelMatrix = function(){
+                    mat4.identity(this.modelMatrix);
+                    mat4.translate(this.modelMatrix, this.position);
+                    mat4.rotate(this.modelMatrix, deg2Rad(this.rotateAngle), this.rotateVector);
+                    mat4.scale(this.modelMatrix, this.scale);
+                }
+            }
+
+            //models
+            var modelsLoaded = [];
+            function model() {
+                this.VertexPositionBuffer;
+                this.VertexNormalBuffer;
+                this.VertexIndexBuffer;
+                this.material;
+                this.transform;
+            }
+
+            function handleLoadedModel(modelData){
+                var toFill = new model();
+                toFill.VertexPositionBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexPositionBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexPositions), gl.STATIC_DRAW);
+                toFill.VertexPositionBuffer.itemSize = 3;
+                toFill.VertexPositionBuffer.numItems = modelData.vertexPositions.length / 3;
+
+                toFill.VertexNormalBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexNormalBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexNormals), gl.STATIC_DRAW);
+                toFill.VertexNormalBuffer.itemSize = 3;
+                toFill.VertexNormalBuffer.numItems = modelData.vertexNormals.length / 3;
+
+                toFill.VertexIndexBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, toFill.VertexIndexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(modelData.indices), gl.STATIC_DRAW);
+                toFill.VertexIndexBuffer.itemSize = 1;
+                toFill.VertexIndexBuffer.numItems = modelData.indices.length;
+
+                modelsLoaded.push(toFill);
+                loadCount -= 1;
+            }
+
+            var loadCount = 0;
+
+            function loadModel(location){
+                var request = new XMLHttpRequest();
+                request.open("GET", location);
+                request.onreadystatechange = function(){
+                    if(request.readyState == 4){
+                        handleLoadedModel(JSON.parse(request.responseText));
+                    }
+                }
+                request.send();
+                loadCount += 1;
+            }
+
+            function drawScene() {
+                gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                for(i in modelsLoaded)
+                {
+                    if(modelsLoaded[i].VertexPositionBuffer)
+                    { 
+                        mat4.multiply(mvMatrix, modelsLoaded[i].transform.modelMatrix);
+                        gl.bindBuffer(gl.ARRAY_BUFFER, modelsLoaded[i].VertexPositionBuffer);
+                        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
+                                                modelsLoaded[i].VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+                        gl.bindBuffer(gl.ARRAY_BUFFER, modelsLoaded[i].VertexNormalBuffer);
+                        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 
+                                                modelsLoaded[i].VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
+                                                
+                        gl.uniform3fv(shaderProgram.Ka_Uniform, modelsLoaded[i].material.Ka);
+                        gl.uniform3fv(shaderProgram.Kd_Uniform, modelsLoaded[i].material.Kd);
+                        gl.uniform3fv(shaderProgram.Ks_Uniform, modelsLoaded[i].material.Ks);
+                        gl.uniform1f(shaderProgram.shininess_Uniform, modelsLoaded[i].material.shininess);
+
+
+                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, modelsLoaded[i].VertexIndexBuffer);
+                        sendMatricesToShader();
+                        gl.drawElements(gl.TRIANGLES, modelsLoaded[i].VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+                        mvPopMatrix();
+                        mvPushMatrix();
+                    }
+                }
+            }
+
+            //inputs
+                //key inputs
+            function handleKeyDown(event){
+                if (event.defaultPrevented) {
+                    return; // Do nothing if the event was already processed
+                }
+
+                switch (event.key) {
+                    case "Down": // IE/Edge specific value
+                    case "ArrowDown":
+                        // Do something for "down arrow" key press.
+                        break;
+                    case "Up": // IE/Edge specific value
+                    case "ArrowUp":
+                        // Do something for "up arrow" key press.
+                        break;
+                    case "Left": // IE/Edge specific value
+                    case "ArrowLeft":
+                        // Do something for "left arrow" key press.
+                        break;
+                    case "Right": // IE/Edge specific value
+                    case "ArrowRight":
+                        // Do something for "right arrow" key press.
+                        break;
+                    case "Enter":
+                        // Do something for "enter" or "return" key press.
+                        break;
+                    case "Esc": // IE/Edge specific value
+                    case "Escape":
+                        // Do something for "esc" key press.
+                        break;
+                    case "r":
+                        ResetCamera();
+                        break;
+                    default:
+                        return; // Quit when this doesn't handle the key event.
+                }
+
+                // Cancel the default action to avoid it being handled twice
+                event.preventDefault();
+            }
+
+                //mouse wheel
+            function handleWheel(event){
+                event.preventDefault();
+                if(event.deltaY < 0)
+                    dist += 0.5;
+                if(event.deltaY > 0)
+                    dist -= 0.5;
+                translate_camera[2] = dist;
+                recalculate_camera = true;
+            }
+
+                //mouse
+            var lastMouseX = null;
+            var lastMouseY = null;
+            var mouseDown = false;
+            var wheelDown = false;
+            var leftDown = false;
+            function handleMouseDown(event){
+                event.preventDefault();
+                mouseDown = true;
+                if(event.button == 1){
+                    wheelDown = true;
+                }
+                if(event.button == 2){
+                    leftDown = true;
+                }
+                lastMouseX = event.clientX;
+                lastMouseY = event.clientY;
+            }
+            function handleMouseUp(event){
+                mouseDown = false;
+                if(event.button == 1){
+                    wheelDown = false;
+                }
+                if(event.button == 2){
+                    leftDown = false;
+                }
+            }
+            function handleMouseMove(event){
+                event.preventDefault();
+                if(!mouseDown){
+                    return;
+                }
+                var newX = event.clientX;
+                var newY = event.clientY;
+                var deltaX = newX - lastMouseX;
+                var deltaY = newY - lastMouseY;
+
+                if(wheelDown){
+                    translate_camera[0] += deltaX * 0.005;
+                    translate_camera[1] += deltaY * 0.005;
+                    recalculate_camera = true;
+                }
+
+                if(leftDown){
+                    var newRotationMatrix = mat4.create();
+                    mat4.identity(newRotationMatrix);
+                    mat4.rotate(newRotationMatrix, deg2Rad(deltaX / 10), [0,1,0]);
+                    mat4.rotate(newRotationMatrix, deg2Rad(deltaY / 10), [1,0,0]);
+                    mat4.multiply(newRotationMatrix, mouseRotationMatrix, mouseRotationMatrix);
+                    recalculate_camera = true;
+                }
+
+                lastMouseX = newX;
+                lastMouseY = newY;
+            }
+
+            var setvalues = true;
+
+            function renderingLoop(){
+                requestAnimationFrame(renderingLoop);
+                if(loadCount == 0 && setvalues)
+                {
+                    //link to materials: http://devernay.free.fr/cours/opengl/materials.html
+                    //chopper
+                    modelsLoaded[0].material = new material();
+                    modelsLoaded[0].material.Ka = [0.19125, 0.0735, 0.0225];
+                    modelsLoaded[0].material.Kd = [0.7038, 0.27048, 0.0828];
+                    modelsLoaded[0].material.Ks = [0.256777, 0.137622, 0.086014];
+                    modelsLoaded[0].material.shininess = 0.1;
+
+                    modelsLoaded[0].transform = new transform();
+                    modelsLoaded[0].transform.position = [-5.0,0.0,-10.0];
+                    modelsLoaded[0].transform.scale = [0.25, 0.25,0.25];
+                    modelsLoaded[0].transform.CalcualteModelMatrix();
+
+                    //cyan plastic
+                    modelsLoaded[1].material = new material();
+                    modelsLoaded[1].material.Ka = [0.0, 0.1, 0.06];
+                    modelsLoaded[1].material.Kd = [0.0, 0.50980392, 0.50980392];
+                    modelsLoaded[1].material.Ks = [0.50196078, 0.50196078, 0.50196078];
+                    modelsLoaded[1].material.shininess = 0.25;
+
+                    modelsLoaded[1].transform = new transform();
+                    modelsLoaded[1].transform.position = [5.0,-1.0,-10.0];
+                    modelsLoaded[1].transform.rotateVector = [1.0, 0.0, 0.0];
+                    modelsLoaded[1].transform.rotateAngle = -90;
+                    modelsLoaded[1].transform.scale = [3.0, 3.0, 3.0];
+                    modelsLoaded[1].transform.CalcualteModelMatrix();
+
+                    setvalues = false;
+                }
+                if(recalculate_camera){
+                    calculateCamera();
+                }
+                drawScene();
+            }
+
+            function webGLStart() {
+                var canvas = document.getElementById("webGL-canvas");
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                document.onkeydown = handleKeyDown;
+                canvas.onmousedown = handleMouseDown;
+                document.onmouseup = handleMouseUp;
+                document.onmousemove = handleMouseMove;
+                document.onwheel = handleWheel;
+
+                initGL(canvas);
+                initShaders();
+
+                loadModel("models/Teapot.json");
+                loadModel("models/Laptop.json");
+
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.enable(gl.DEPTH_TEST);
+                gl.enable(gl.CULL_FACE);
+                gl.cullFace(gl.BACK);
+
+                renderingLoop();
+            }
+
+        </script>
+
+    </head>
+
+    <body onload="webGLStart();" onresize="webGLStart();">
+        <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
+    </body>
+
+</html>
