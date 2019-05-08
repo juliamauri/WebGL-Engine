@@ -8,22 +8,37 @@
 
         <script id="shader-vs" type="x-shader/x-vertex">
             attribute vec3 aVertexPosition;
+            attribute vec3 aVertexNormal;
 
             uniform mat4 uMVMatrix;
             uniform mat4 uPMatrix;
+            uniform mat3 uNMatrix;
+
+            uniform vec3 L;
+            uniform vec3 Ia;
+            uniform vec3 Ip;
+
+            uniform vec3 Ka;
+            uniform vec3 Kd;
+
+            varying vec3 shadedColor;
 
             void main(void) {
                 gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+
+                vec3 N = uNMatrix * normalize(aVertexNormal);
+                float dotNL = max(dot(N, L), 0.0);
+                shadedColor = Ka * Ia + Kd * Ip * dotNL;
             }
         </script>
 
         <script id="shader-fs" type="x-shader/x-fragment">
             precision mediump float;
 
-            uniform vec3 color;
+            varying vec3 shadedColor;
 
             void main(void) {
-                gl_FragColor = vec4(color,1.0);
+                gl_FragColor = vec4(shadedColor,1.0);
             }
         </script>
 
@@ -82,11 +97,6 @@
             var mvMatrix = mat4.create(); //model view
             var pMatrix = mat4.create(); //projection
 
-            function sendMatricesToShader() {
-                gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
-                gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
-            }
-
             function mvPushMatrix(){
                 var copy = mat4.create();
                 mat4.set(mvMatrix, copy);
@@ -97,6 +107,11 @@
                 if(mvMatrixStack.length > 0){
                     mvMatrix = mvMatrixStack.pop();
                 }
+            }
+
+            //degtorad
+            function deg2Rad(angle){
+                return angle * Math.PI / 180
             }
 
             //Camera values
@@ -143,27 +158,81 @@
 
                 shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
                 gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-                
+                shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+                gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
                 shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
                 shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-                shaderProgram.colorUniform = gl.getUniformLocation(shaderProgram, "color");
+                shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
+
+                shaderProgram.L_Uniform = gl.getUniformLocation(shaderProgram, "L");
+                shaderProgram.Ia_Uniform = gl.getUniformLocation(shaderProgram, "Ia");
+                shaderProgram.Ip_Uniform = gl.getUniformLocation(shaderProgram, "Ip");
+
+                shaderProgram.Ka_Uniform = gl.getUniformLocation(shaderProgram, "Ka");
+                shaderProgram.Kd_Uniform = gl.getUniformLocation(shaderProgram, "Kd");
                 
                 //precalculating variables that will never change
                 mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
+                var defLight = new light();
+                var normalized_L = vec3.create();
+                vec3.normalize(defLight.lightDirection, normalized_L);
+                gl.uniform3fv(shaderProgram.L_Uniform, normalized_L);
+                gl.uniform3fv(shaderProgram.Ia_Uniform, defLight.Ia);
+                gl.uniform3fv(shaderProgram.Ip_Uniform, defLight.Ip);
+
                 recalculate_camera = true;
+            }
+
+            function sendMatricesToShader() {
+                gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+                gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+
+                var normalMatrix = mat3.create();
+                mat4.toInverseMat3(mvMatrix, normalMatrix);
+                mat3.transpose(normalMatrix);
+                gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
+            }
+
+            //light
+            function light(){
+                this.lightDirection = [1.0,1.0,1.0];
+                this.Ia = [0.8,0.3,0.3];
+                this.Ip = [0.5,0.5,0.5];
+            }
+
+
+            //material
+            function material(){
+                this.Ka = [1.0,0.3,0.0]; //material ambient
+                this.Kd = [1.0,0.3,0.0]; //material diffuse
+            }
+
+            //Transform
+            function transform(){
+                this.position = [0,0,0];
+                this.rotateAngle = 0;
+                this.rotateVector = [0,0,0];
+                this.scale = [1,1,1];
+                this.modelMatrix = mat4.create();
+                mat4.identity(this.modelMatrix);
+                this.CalcualteModelMatrix = function(){
+                    mat4.identity(this.modelMatrix);
+                    mat4.translate(this.modelMatrix, this.position);
+                    mat4.rotate(this.modelMatrix, deg2Rad(this.rotateAngle), this.rotateVector);
+                    mat4.scale(this.modelMatrix, this.scale);
+                }
             }
 
             //models
             var modelsLoaded = [];
             function model() {
                 this.VertexPositionBuffer;
+                this.VertexNormalBuffer;
                 this.VertexIndexBuffer;
-                this.color = [1,1,1];
-                this.position = [0,0,0];
-                this.rotateAngle = 0;
-                this.rotateVector = [0,0,0];
-                this.scale = [1,1,1];
+                this.material;
+                this.transform;
             }
 
             function handleLoadedModel(modelData){
@@ -173,6 +242,12 @@
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexPositions), gl.STATIC_DRAW);
                 toFill.VertexPositionBuffer.itemSize = 3;
                 toFill.VertexPositionBuffer.numItems = modelData.vertexPositions.length / 3;
+
+                toFill.VertexNormalBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexNormalBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexNormals), gl.STATIC_DRAW);
+                toFill.VertexNormalBuffer.itemSize = 3;
+                toFill.VertexNormalBuffer.numItems = modelData.vertexNormals.length / 3;
 
                 toFill.VertexIndexBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, toFill.VertexIndexBuffer);
@@ -202,13 +277,17 @@
                 {
                     if(modelsLoaded[i].VertexPositionBuffer)
                     { 
-                        mat4.translate(mvMatrix, modelsLoaded[i].position);
-                        mat4.rotate(mvMatrix, modelsLoaded[i].rotateAngle * Math.PI / 180, modelsLoaded[i].rotateVector);
-                        mat4.scale(mvMatrix, modelsLoaded[i].scale);
+                        mat4.multiply(mvMatrix, modelsLoaded[i].transform.modelMatrix);
                         gl.bindBuffer(gl.ARRAY_BUFFER, modelsLoaded[i].VertexPositionBuffer);
                         gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
                                                 modelsLoaded[i].VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-                        gl.uniform3fv(shaderProgram.colorUniform, modelsLoaded[i].color);
+                        gl.bindBuffer(gl.ARRAY_BUFFER, modelsLoaded[i].VertexNormalBuffer);
+                        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 
+                                                modelsLoaded[i].VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
+                                                
+                        gl.uniform3fv(shaderProgram.Ka_Uniform, modelsLoaded[i].material.Ka);
+                        gl.uniform3fv(shaderProgram.Kd_Uniform, modelsLoaded[i].material.Kd);
+
                         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, modelsLoaded[i].VertexIndexBuffer);
                         sendMatricesToShader();
                         gl.drawElements(gl.TRIANGLES, modelsLoaded[i].VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
@@ -317,8 +396,8 @@
                 if(leftDown){
                     var newRotationMatrix = mat4.create();
                     mat4.identity(newRotationMatrix);
-                    mat4.rotate(newRotationMatrix, deltaX / 10 * Math.PI / 180, [0,1,0]);
-                    mat4.rotate(newRotationMatrix, deltaY / 10 * Math.PI / 180, [1,0,0]);
+                    mat4.rotate(newRotationMatrix, deg2Rad(deltaX / 10), [0,1,0]);
+                    mat4.rotate(newRotationMatrix, deg2Rad(deltaY / 10), [1,0,0]);
                     mat4.multiply(newRotationMatrix, mouseRotationMatrix, mouseRotationMatrix);
                     recalculate_camera = true;
                 }
@@ -333,14 +412,28 @@
                 requestAnimationFrame(renderingLoop);
                 if(setvalues)
                 {
-                    modelsLoaded[0].color = [1.0, 0.5, 0.1];
-                    modelsLoaded[0].position = [-5.0,0.0,-10.0];
-                    modelsLoaded[0].scale = [0.25, 0.25,0.25];
-                    modelsLoaded[1].color = [0.0, 0.0, 1.0];
-                    modelsLoaded[1].position = [5.0,-1.0,-10.0];
-                    modelsLoaded[1].rotateVector = [1.0, 0.0, 0.0];
-                    modelsLoaded[1].rotateAngle = -90;
-                    modelsLoaded[1].scale = [3.0, 3.0, 3.0];
+                    //link to materials: http://devernay.free.fr/cours/opengl/materials.html
+                    //chopper
+                    modelsLoaded[0].material = new material();
+                    modelsLoaded[0].material.Ka = [0.19125, 0.0735, 0.0225];
+                    modelsLoaded[0].material.Kd = [0.7038, 0.27048, 0.0828];
+
+                    modelsLoaded[0].transform = new transform();
+                    modelsLoaded[0].transform.position = [-5.0,0.0,-10.0];
+                    modelsLoaded[0].transform.scale = [0.25, 0.25,0.25];
+                    modelsLoaded[0].transform.CalcualteModelMatrix();
+
+                    //cyan plastic
+                    modelsLoaded[1].material = new material();
+                    modelsLoaded[1].material.Ka = [0.0, 0.1, 0.06];
+                    modelsLoaded[1].material.Kd = [0.0, 0.50980392, 0.50980392];
+
+                    modelsLoaded[1].transform = new transform();
+                    modelsLoaded[1].transform.position = [5.0,-1.0,-10.0];
+                    modelsLoaded[1].transform.rotateVector = [1.0, 0.0, 0.0];
+                    modelsLoaded[1].transform.rotateAngle = -90;
+                    modelsLoaded[1].transform.scale = [3.0, 3.0, 3.0];
+                    modelsLoaded[1].transform.CalcualteModelMatrix();
 
                     setvalues = false;
                 }
@@ -365,7 +458,6 @@
                 initShaders();
 
                 loadModel("models/Teapot.json");
-
                 loadModel("models/Laptop.json");
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
