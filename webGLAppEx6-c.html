@@ -231,9 +231,9 @@
                 this.rotateAngle = 0;
                 this.rotateVector = [0,0,0];
                 this.scale = [1,1,1];
-                this.modelMatrix = mat4.create();
-                mat4.identity(this.modelMatrix);
+                this.modelMatrix;
                 this.CalcualteModelMatrix = function(){
+                    this.modelMatrix = mat4.create();
                     mat4.identity(this.modelMatrix);
                     mat4.translate(this.modelMatrix, this.position);
                     mat4.rotate(this.modelMatrix, deg2Rad(this.rotateAngle), this.rotateVector);
@@ -440,7 +440,7 @@
                     modelsLoaded[0].material.Ka = [0.60, 0.3, 0.0225];
                     modelsLoaded[0].material.Kd = [0.7038, 0.27048, 0.0828];
                     modelsLoaded[0].material.Ks = [0.256777, 0.137622, 0.086014];
-                    modelsLoaded[0].material.shininess = 0.1;
+                    modelsLoaded[0].material.shininess = 0.6;
 
                     modelsLoaded[0].transform = new transform();
                     modelsLoaded[0].transform.position = [-5.0,0.0,-10.0];
