@@ -249,8 +249,10 @@
                 load_items--;
 
                 var MeshesLoadedtext = document.createTextNode(name);
-                MeshesLoaded.appendChild(MeshesLoadedtext);
-                MeshesLoaded.innerHTML += "<br/>";
+                var NodeMesh = document.createElement(name+"Mesh");
+                NodeMesh.appendChild(MeshesLoadedtext);
+                NodeMesh.innerHTML += "<br/>";
+                MeshesLoaded_HTMLEmement.appendChild(NodeMesh);
             }
 
             function loadModel(location, name){
@@ -424,8 +426,8 @@
                 lastMouseY = newY;
             }
 // #endregion
-var overlay;
-var MeshesLoaded;
+var canvas;
+var MeshesLoaded_HTMLEmement;
 //#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
@@ -436,7 +438,7 @@ var MeshesLoaded;
             }
 
             function webGLStart() {
-                var canvas = document.getElementById("webGL-canvas");
+                canvas = document.getElementById("webGL-canvas");
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
 
@@ -446,14 +448,10 @@ var MeshesLoaded;
                 document.onmousemove = handleMouseMove;
                 document.onwheel = handleWheel;
 
-                overlay = document.getElementById("overlay");
-                MeshesLoaded = document.createElement("MeshesLoaded");
-                var MeshesLoadedtext = document.createTextNode("Meshes Loaded: ");
-                MeshesLoaded.appendChild(MeshesLoadedtext);
-                MeshesLoaded.innerHTML +=  "<br/>";
-                overlay.appendChild(MeshesLoaded);
+                MeshesLoaded_HTMLEmement = document.getElementById("ResourcesMesh");
+                //overlay.appendChild(MeshesLoaded_HTMLEmement);
 
-                dragElement(document.getElementById("mydiv"));
+                dragElement(MeshesLoaded_HTMLEmement);
                 
                 document.getElementById("input_number").value = 0.5;
 
@@ -465,7 +463,7 @@ var MeshesLoaded;
                 createInput.value = 3.65;
                 inputContainer.innerHTML = "X: "
                 inputContainer.appendChild(createInput);
-                overlay.appendChild(inputContainer);
+                document.getElementById("overlay").appendChild(inputContainer);
 
                 initGL(canvas);
                 initShaders();
@@ -497,6 +495,16 @@ var MeshesLoaded;
 
                 renderingLoop();
             }
+
+            function ScreenChanged(){
+                canvas = document.getElementById("webGL-canvas");
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                initGL(canvas);
+                mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+                renderingLoop();
+            } 
 //#endregion
 
 //#region draggable html element
@@ -556,7 +564,7 @@ var MeshesLoaded;
                 color:blue;
                 background: beige;
             }
-            #mydiv {
+            #ResourcesMesh {
             position: absolute;
             left: 10px;
             top: 120px;
@@ -566,7 +574,7 @@ var MeshesLoaded;
             text-align: center;
             }
 
-            #mydivheader {
+            #ResourcesMeshheader {
             padding: 10px;
             cursor: move;
             z-index: 10;
@@ -574,22 +582,18 @@ var MeshesLoaded;
             color: #fff;
             }
         </style >
-
     </head>
 
-    <body onload="webGLStart();" onresize="webGLStart();">
+    <body onload="webGLStart();" onresize="ScreenChanged();">
         <div class="container">
             <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
             <div id="overlay">
                 Test number input: <input id="input_number" type="number" step="0.01" name="fname"><br>
             </div>
-            <div id="mydiv">
+            <div id="ResourcesMesh">
                 <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
-                <div id="mydivheader">Click here to move</div>
-                <p>Move</p>
-                <p>this</p>
-                <p>DIV</p>
-              </div>
+                <div id="ResourcesMeshheader">Resources Mesh Loaded</div>
+            </div>
         </div>
     </body>
 
