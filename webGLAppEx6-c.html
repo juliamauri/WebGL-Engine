@@ -284,7 +284,7 @@
 
                 GameObjects_HTMLEmement.appendChild(go_button);
                 GameObjects_HTMLEmement.appendChild(content_go);
-                
+
                 go_button.addEventListener("click", function() {
                     this.classList.toggle("active");
                     var content = this.nextElementSibling;
@@ -472,8 +472,9 @@ var GameObjects_HTMLEmement;
                 MeshesLoaded_HTMLEmement = document.getElementById("ResourcesMesh");
                 GameObjects_HTMLEmement = document.getElementById("GameObjects");
 
-                dragElement(MeshesLoaded_HTMLEmement);
-                dragElement(GameObjects_HTMLEmement);
+                //when drag scene blocked
+                //dragElement(MeshesLoaded_HTMLEmement);
+                //dragElement(GameObjects_HTMLEmement);
 
                 document.getElementById("input_number").value = 0.5;
 
