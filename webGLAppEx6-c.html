@@ -5,6 +5,11 @@
 
         <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
         <script type="text/javascript" src="webgl-utils.js"></script>
+        <script type="text/javascript" src="Materials.js"></script>
+        <script type="text/javascript" src="Light.js"></script>
+        <script type="text/javascript" src="Transform.js"></script>
+        <script type="text/javascript" src="ResourceMesh.js"></script>
+        <script type="text/javascript" src="GameObject.js"></script>
 
         <script id="shader-vs" type="x-shader/x-vertex">
             attribute vec3 aVertexPosition;
@@ -32,10 +37,10 @@
             uniform vec3 Ka, Kd, Ks; //material color
             uniform float shiniess; //material color
 
+            uniform vec3 lightPositionEye; //light position
+
             varying vec3 normalEye;
             varying vec4 positionEye;
-
-            const vec3 lightPositionEye = vec3(1.0, 0.5, 0.0);
 
             void main(void) {
                 vec3 L = normalize(lightPositionEye - positionEye.xyz);
@@ -54,6 +59,7 @@
 
         <script type="text/javascript">
 
+//#region GL Basics Load
             var gl;
             function initGL(canvas) {
                 try {
@@ -101,7 +107,9 @@
             
                 return shader;
             }
-
+//#endregion
+            
+//#region Matrices
             //Matrices
             var mvMatrixStack = []; //store view of camera
             var mvMatrix = mat4.create(); //model view
@@ -123,7 +131,9 @@
             function deg2Rad(angle){
                 return angle * Math.PI / 180
             }
+//#endregion
 
+//#region Camera
             //Camera values
             var recalculate_camera = false;
             var dist = 0;
@@ -147,8 +157,9 @@
                 translate_camera = [0.0,0.0,0.0];
                 recalculate_camera = true;
             }
+//#endregion
 
-            //shaders
+//#region Shaders
             var shaderProgram;
 
             function initShaders() {
@@ -178,6 +189,7 @@
                 shaderProgram.Ia_Uniform = gl.getUniformLocation(shaderProgram, "Ia");
                 shaderProgram.Id_Uniform = gl.getUniformLocation(shaderProgram, "Id");
                 shaderProgram.Is_Uniform = gl.getUniformLocation(shaderProgram, "Is");
+                shaderProgram.lightPositionEye_Uniform = gl.getUniformLocation(shaderProgram, "lightPositionEye");
 
                 shaderProgram.Ka_Uniform = gl.getUniformLocation(shaderProgram, "Ka");
                 shaderProgram.Kd_Uniform = gl.getUniformLocation(shaderProgram, "Kd");
@@ -188,13 +200,14 @@
                 mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
                 var defLight = new light();
-                defLight.Ia = [0.2, 0.2, 0.2];
-                defLight.Id = [0.5, 0.5, 0.5];
-                defLight.Is = [1.0, 1.0, 1.0];
+                defLight.material = Material_WhitePlastic;
+                defLight.position = [ 1.0, 0.5, 0.0 ];
 
-                gl.uniform3fv(shaderProgram.Ia_Uniform, defLight.Ia);
-                gl.uniform3fv(shaderProgram.Id_Uniform, defLight.Id);
-                gl.uniform3fv(shaderProgram.Is_Uniform, defLight.Is);
+                gl.uniform3f(shaderProgram.Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
+                gl.uniform3f(shaderProgram.Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
+                gl.uniform3f(shaderProgram.Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
+
+                gl.uniform3f(shaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
 
                 recalculate_camera = true;
             }
@@ -208,53 +221,12 @@
                 mat3.transpose(normalMatrix);
                 gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
             }
+//#endregion
 
-            //light
-            function light(){
-                this.Ia = [0.0,0.0,0.0];
-                this.Id = [0.0,0.0,0.0];
-                this.Is = [0.0,0.0,0.0];
-            }
-
-
-            //material
-            function material(){
-                this.Ka = [1.0,0.3,0.0]; //material ambient
-                this.Kd = [1.0,0.3,0.0]; //material diffuse
-                this.Ks = [1.0,0.3,0.0]; //material shininess
-                this.shininess = 1.0;
-            }
-
-            //Transform
-            function transform(){
-                this.position = [0,0,0];
-                this.rotateAngle = 0;
-                this.rotateVector = [0,0,0];
-                this.scale = [1,1,1];
-                this.modelMatrix;
-                this.CalcualteModelMatrix = function(){
-                    this.modelMatrix = mat4.create();
-                    mat4.identity(this.modelMatrix);
-                    mat4.translate(this.modelMatrix, this.position);
-                    mat4.rotate(this.modelMatrix, deg2Rad(this.rotateAngle), this.rotateVector);
-                    mat4.scale(this.modelMatrix, this.scale);
-                }
-            }
-
-            //models
-            var modelsLoaded = [];
-            function model() {
-                this.VertexPositionBuffer;
-                this.VertexNormalBuffer;
-                this.VertexIndexBuffer;
-                this.material;
-                this.transform;
-            }
-
-            var loadCount = 0;
-
-            function handleLoadedModel(modelData){
-                var toFill = new model();
+//#region LoadingModels
+            var load_items = 0;
+            function handleLoadedModel(modelData, name){
+                var toFill = new ResourceMesh();
                 toFill.VertexPositionBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexPositionBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexPositions), gl.STATIC_DRAW);
@@ -273,52 +245,72 @@
                 toFill.VertexIndexBuffer.itemSize = 1;
                 toFill.VertexIndexBuffer.numItems = modelData.indices.length;
 
-                modelsLoaded.push(toFill);
-                loadCount -= 1;
+                MeshesLoaded[name] = toFill;
+                load_items--;
             }
 
-            function loadModel(location){
+            function loadModel(location, name){
                 var request = new XMLHttpRequest();
                 request.open("GET", location);
                 request.onreadystatechange = function(){
                     if(request.readyState == 4){
-                        handleLoadedModel(JSON.parse(request.responseText));
+                        handleLoadedModel(JSON.parse(request.responseText), name);
                     }
                 }
                 request.send();
-                loadCount += 1;
+                load_items++;
+            }
+//#endregion
+
+//#region Scene
+            var SceneGameObjects = [];
+
+            function AddGo(name){
+                var Go = new GameObject(name);
+                var retId = SceneGameObjects.length;
+                SceneGameObjects.push(Go);
+                return retId;
             }
 
             function drawScene() {
                 gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-                for(i in modelsLoaded)
+                if(load_items == 0)
                 {
-                    if(modelsLoaded[i].VertexPositionBuffer)
-                    { 
-                        mat4.multiply(mvMatrix, modelsLoaded[i].transform.modelMatrix);
-                        gl.bindBuffer(gl.ARRAY_BUFFER, modelsLoaded[i].VertexPositionBuffer);
-                        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
-                                                modelsLoaded[i].VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-                        gl.bindBuffer(gl.ARRAY_BUFFER, modelsLoaded[i].VertexNormalBuffer);
-                        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 
-                                                modelsLoaded[i].VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
-                                                
-                        gl.uniform3fv(shaderProgram.Ka_Uniform, modelsLoaded[i].material.Ka);
-                        gl.uniform3fv(shaderProgram.Kd_Uniform, modelsLoaded[i].material.Kd);
-                        gl.uniform3fv(shaderProgram.Ks_Uniform, modelsLoaded[i].material.Ks);
-                        gl.uniform1f(shaderProgram.shininess_Uniform, modelsLoaded[i].material.shininess);
+                    for(i in SceneGameObjects)
+                    {
+                        var go = SceneGameObjects[i];
+                        var mesh_toDraw = MeshesLoaded[go.mesh];
+                        if(mesh_toDraw.VertexPositionBuffer)
+                        { 
+                            mat4.multiply(mvMatrix, go.transform.modelMatrix);
+                            
+                            gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexPositionBuffer);
+                            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
+                                                    mesh_toDraw.VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+                            
+                                                    gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexNormalBuffer);
+                            gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 
+                                                    mesh_toDraw.VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
+                                                    
+                            gl.uniform3f(shaderProgram.Ka_Uniform, go.material.Ka[0], go.material.Ka[1], go.material.Ka[2]);
+                            gl.uniform3f(shaderProgram.Kd_Uniform, go.material.Kd[0], go.material.Kd[1], go.material.Kd[2]);
+                            gl.uniform3f(shaderProgram.Ks_Uniform, go.material.Ks[0], go.material.Ks[1], go.material.Ks[2]);
+                            gl.uniform1f(shaderProgram.shininess_Uniform, go.material.shininess);
 
-                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, modelsLoaded[i].VertexIndexBuffer);
-                        sendMatricesToShader();
-                        gl.drawElements(gl.TRIANGLES, modelsLoaded[i].VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-                        mvPopMatrix();
-                        mvPushMatrix();
+                            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh_toDraw.VertexIndexBuffer);
+                            sendMatricesToShader();
+                            gl.drawElements(gl.TRIANGLES, mesh_toDraw.VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+                            mvPopMatrix();
+                            mvPushMatrix();
+                        }
                     }
-                }
+                } 
             }
+//#endregion
 
+//#region Input
             //inputs
                 //key inputs
             function handleKeyDown(event){
@@ -427,42 +419,11 @@
                 lastMouseX = newX;
                 lastMouseY = newY;
             }
+// #endregion
 
-            var setvalues = true;
-
+//#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
-                if(loadCount == 0 && setvalues)
-                {
-                    //link to materials: http://devernay.free.fr/cours/opengl/materials.html
-                    //chopper
-                    modelsLoaded[0].material = new material();
-                    modelsLoaded[0].material.Ka = [0.60, 0.3, 0.0225];
-                    modelsLoaded[0].material.Kd = [0.7038, 0.27048, 0.0828];
-                    modelsLoaded[0].material.Ks = [0.256777, 0.137622, 0.086014];
-                    modelsLoaded[0].material.shininess = 0.6;
-
-                    modelsLoaded[0].transform = new transform();
-                    modelsLoaded[0].transform.position = [-5.0,0.0,-10.0];
-                    modelsLoaded[0].transform.scale = [0.25, 0.25,0.25];
-                    modelsLoaded[0].transform.CalcualteModelMatrix();
-
-                    //cyan plastic
-                    modelsLoaded[1].material = new material();
-                    modelsLoaded[1].material.Ka = [0.0, 0.1, 0.65];
-                    modelsLoaded[1].material.Kd = [0.0, 0.50980392, 0.50980392];
-                    modelsLoaded[1].material.Ks = [0.50196078, 0.50196078, 0.50196078];
-                    modelsLoaded[1].material.shininess = 0.25;
-
-                    modelsLoaded[1].transform = new transform();
-                    modelsLoaded[1].transform.position = [5.0,-1.0,-10.0];
-                    modelsLoaded[1].transform.rotateVector = [1.0, 0.0, 0.0];
-                    modelsLoaded[1].transform.rotateAngle = -90;
-                    modelsLoaded[1].transform.scale = [3.0, 3.0, 3.0];
-                    modelsLoaded[1].transform.CalcualteModelMatrix();
-
-                    setvalues = false;
-                }
                 if(recalculate_camera){
                     calculateCamera();
                 }
@@ -483,8 +444,25 @@
                 initGL(canvas);
                 initShaders();
 
-                loadModel("models/Teapot.json");
-                loadModel("models/Laptop.json");
+                var teapot = AddGo("GO Teapot");
+                SceneGameObjects[teapot].mesh = "teapot";
+                loadModel("models/Teapot.json", SceneGameObjects[teapot].mesh);
+                SceneGameObjects[teapot].material = Material_Copper;
+                SceneGameObjects[teapot].transform = new transform();
+                SceneGameObjects[teapot].transform.position = [-5.0,0.0,-10.0];
+                SceneGameObjects[teapot].transform.scale = [0.25, 0.25,0.25];
+                SceneGameObjects[teapot].transform.CalcualteModelMatrix();
+
+                var laptop = AddGo("GO Laptop");
+                SceneGameObjects[laptop].mesh = "laptop";
+                loadModel("models/Laptop.json", SceneGameObjects[laptop].mesh);
+                SceneGameObjects[laptop].material = Material_CyanPlastic;
+                SceneGameObjects[laptop].transform = new transform();
+                SceneGameObjects[laptop].transform.position = [5.0,-1.0,-10.0];
+                SceneGameObjects[laptop].transform.rotateVector = [1.0, 0.0, 0.0];
+                SceneGameObjects[laptop].transform.rotateAngle = -90;
+                SceneGameObjects[laptop].transform.scale = [3.0, 3.0, 3.0];
+                SceneGameObjects[laptop].transform.CalcualteModelMatrix();
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
                 gl.enable(gl.DEPTH_TEST);
@@ -493,7 +471,7 @@
 
                 renderingLoop();
             }
-
+//#endregion
         </script>
 
     </head>
