@@ -248,8 +248,9 @@
                 MeshesLoaded[name] = toFill;
                 load_items--;
 
-                var MeshesLoadedtext = document.createTextNode("\n" +name +",");
+                var MeshesLoadedtext = document.createTextNode(name);
                 MeshesLoaded.appendChild(MeshesLoadedtext);
+                MeshesLoaded.innerHTML += "<br/>";
             }
 
             function loadModel(location, name){
@@ -449,12 +450,22 @@ var MeshesLoaded;
                 MeshesLoaded = document.createElement("MeshesLoaded");
                 var MeshesLoadedtext = document.createTextNode("Meshes Loaded: ");
                 MeshesLoaded.appendChild(MeshesLoadedtext);
-
+                MeshesLoaded.innerHTML +=  "<br/>";
                 overlay.appendChild(MeshesLoaded);
 
                 dragElement(document.getElementById("mydiv"));
+                
+                document.getElementById("input_number").value = 0.5;
 
-
+                var inputContainer = document.createElement("input_test");
+                var inputText = document.createElement("InputText").appendChild(document.createTextNode("X: "));
+                var createInput = document.createElement("INPUT");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.01");
+                createInput.value = 3.65;
+                inputContainer.innerHTML = "X: "
+                inputContainer.appendChild(createInput);
+                overlay.appendChild(inputContainer);
 
                 initGL(canvas);
                 initShaders();
@@ -505,7 +516,7 @@ var MeshesLoaded;
                     e.preventDefault();
                     // get the mouse cursor position at startup:
                     pos3 = e.clientX;
-                    pos4 = e.clientY;
+                    pos4 = e.clientY
                     document.onmouseup = closeDragElement;
                     // call a function whenever the cursor moves:
                     document.onmousemove = elementDrag;
@@ -548,7 +559,7 @@ var MeshesLoaded;
             #mydiv {
             position: absolute;
             left: 10px;
-            top: 60px;
+            top: 120px;
             z-index: 9;
             background-color: #f1f1f1;
             border: 1px solid #d3d3d3;
@@ -570,7 +581,7 @@ var MeshesLoaded;
         <div class="container">
             <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
             <div id="overlay">
-                Test number input: <input type="number" name="fname"><br>
+                Test number input: <input id="input_number" type="number" step="0.01" name="fname"><br>
             </div>
             <div id="mydiv">
                 <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
