@@ -58,7 +58,6 @@
         </script>
 
         <script type="text/javascript">
-
 //#region GL Basics Load
             var gl;
             function initGL(canvas) {
@@ -275,6 +274,27 @@
                 var Go = new GameObject(name);
                 var retId = SceneGameObjects.length;
                 SceneGameObjects.push(Go);
+
+                var go_button = document.createElement("button");
+                go_button.setAttribute("class","collapsible");
+                go_button.innerHTML += name;
+                var content_go = document.createElement("div");
+                content_go.setAttribute("class","content");
+                content_go.innerHTML += "test";
+
+                GameObjects_HTMLEmement.appendChild(go_button);
+                GameObjects_HTMLEmement.appendChild(content_go);
+                
+                go_button.addEventListener("click", function() {
+                    this.classList.toggle("active");
+                    var content = this.nextElementSibling;
+                    if (content.style.maxHeight){
+                    content.style.maxHeight = null;
+                    } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    } 
+                });
+  
                 return retId;
             }
 
@@ -428,6 +448,7 @@
 // #endregion
 var canvas;
 var MeshesLoaded_HTMLEmement;
+var GameObjects_HTMLEmement;
 //#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
@@ -449,10 +470,11 @@ var MeshesLoaded_HTMLEmement;
                 document.onwheel = handleWheel;
 
                 MeshesLoaded_HTMLEmement = document.getElementById("ResourcesMesh");
-                //overlay.appendChild(MeshesLoaded_HTMLEmement);
+                GameObjects_HTMLEmement = document.getElementById("GameObjects");
 
                 dragElement(MeshesLoaded_HTMLEmement);
-                
+                dragElement(GameObjects_HTMLEmement);
+
                 document.getElementById("input_number").value = 0.5;
 
                 var inputContainer = document.createElement("input_test");
@@ -539,8 +561,13 @@ var MeshesLoaded_HTMLEmement;
                     pos3 = e.clientX;
                     pos4 = e.clientY;
                     // set the element's new position:
-                    elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
-                    elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                    var set = elmnt.offsetTop - pos2;
+                    if(set < 10){
+                        set = 10;
+                    }
+                    elmnt.style.top = set + "px";
+                    //elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                    //elmnt.style.right = (elmnt.offsetRight + pos1) + "px";  
                 }
 
                 function closeDragElement() {
@@ -581,6 +608,60 @@ var MeshesLoaded_HTMLEmement;
             background-color: #2196F3;
             color: #fff;
             }
+
+            #GameObjects {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            z-index: 9;
+            background-color: #f1f1f1;
+            border: 1px solid #d3d3d3;
+            text-align: center;
+            }
+
+            #GameObjectsheader {
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            background-color: #2196F3;
+            color: #fff;
+            }
+
+            .collapsible {
+              background-color: #777;
+              color: white;
+              cursor: pointer;
+              padding: 18px;
+              width: 100%;
+              border: none;
+              text-align: left;
+              outline: none;
+              font-size: 15px;
+            }
+            
+            .active, .collapsible:hover {
+              background-color: #555;
+            }
+            
+            .collapsible:after {
+              content: '\002B';
+              color: white;
+              font-weight: bold;
+              float: right;
+              margin-left: 5px;
+            }
+            
+            .active:after {
+              content: "\2212";
+            }
+            
+            .content {
+              padding: 0 18px;
+              max-height: 0;
+              overflow: hidden;
+              transition: max-height 0.2s ease-out;
+              background-color: #f1f1f1;
+            }
         </style >
     </head>
 
@@ -593,6 +674,10 @@ var MeshesLoaded_HTMLEmement;
             <div id="ResourcesMesh">
                 <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
                 <div id="ResourcesMeshheader">Resources Mesh Loaded</div>
+            </div>
+            <div id="GameObjects">
+                <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
+                <div id="GameObjectsheader">GameObjects</div>
             </div>
         </div>
     </body>
