@@ -1,6 +1,6 @@
-function GameObject(name) {
+function GameObject(name, transform, mesh, material) {
     this.name = name,
-    this.mesh;
-    this.material = null;
-    this.transform = null;
+    this.transform = transform;
+    this.mesh = mesh;
+    this.material = material;
 }

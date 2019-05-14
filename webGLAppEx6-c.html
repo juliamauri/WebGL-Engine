@@ -270,17 +270,177 @@
 //#region Scene
             var SceneGameObjects = [];
 
-            function AddGo(name){
-                var Go = new GameObject(name);
+            function AddGo(name, TRS, mesh, material){
+
+                if(TRS == null){
+                    TRS = new transform();
+                    TRS.CalcualteModelMatrix();
+                }
+
+                var Go = new GameObject(name, TRS, mesh, material);
                 var retId = SceneGameObjects.length;
                 SceneGameObjects.push(Go);
-
+//#region Html Content
                 var go_button = document.createElement("button");
                 go_button.setAttribute("class","collapsible");
                 go_button.innerHTML += name;
                 var content_go = document.createElement("div");
                 content_go.setAttribute("class","content");
-                content_go.innerHTML += "test";
+                content_go.appendChild(document.createTextNode("Transform:"));
+                content_go.innerHTML += "<br/>";
+
+                content_go.appendChild(document.createTextNode("Position:"));
+                var inputContainer = document.createElement("div");
+                var createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.position[0];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.position[0] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.position[1];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.position[1] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.position[2];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.position[2] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                content_go.appendChild(document.createTextNode("Rotation:"));
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateVector[0];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateVector[0] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateVector[1];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateVector[1] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateVector[2];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateVector[2] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateAngle;
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateAngle = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "º: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                content_go.appendChild(document.createTextNode("Scale:"));
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.scale[0];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.scale[0] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.scale[1];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.scale[1] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.scale[2];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.scale[2] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
 
                 GameObjects_HTMLEmement.appendChild(go_button);
                 GameObjects_HTMLEmement.appendChild(content_go);
@@ -294,7 +454,7 @@
                     content.style.maxHeight = content.scrollHeight + "px";
                     } 
                 });
-  
+  //#endregion
                 return retId;
             }
 
@@ -307,35 +467,40 @@
                     for(i in SceneGameObjects)
                     {
                         var go = SceneGameObjects[i];
-                        var mesh_toDraw = MeshesLoaded[go.mesh];
-                        if(mesh_toDraw.VertexPositionBuffer)
-                        { 
-                            mat4.multiply(mvMatrix, go.transform.modelMatrix);
-                            
-                            gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexPositionBuffer);
-                            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
-                                                    mesh_toDraw.VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-                            
-                                                    gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexNormalBuffer);
-                            gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 
-                                                    mesh_toDraw.VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
-                                                    
-                            gl.uniform3f(shaderProgram.Ka_Uniform, go.material.Ka[0], go.material.Ka[1], go.material.Ka[2]);
-                            gl.uniform3f(shaderProgram.Kd_Uniform, go.material.Kd[0], go.material.Kd[1], go.material.Kd[2]);
-                            gl.uniform3f(shaderProgram.Ks_Uniform, go.material.Ks[0], go.material.Ks[1], go.material.Ks[2]);
-                            gl.uniform1f(shaderProgram.shininess_Uniform, go.material.shininess);
+                        if(go.mesh != ""){
+                            var mesh_toDraw = MeshesLoaded[go.mesh];
+                            var mat = go.material;
+                            if(mat == null){
+                                mat = Material_Emerland;
+                            }
+                            if(mesh_toDraw.VertexPositionBuffer)
+                            { 
+                                mat4.multiply(mvMatrix, go.transform.modelMatrix);
+                                
+                                gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexPositionBuffer);
+                                gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 
+                                                        mesh_toDraw.VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+                                
+                                                        gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexNormalBuffer);
+                                gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 
+                                                        mesh_toDraw.VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
+                                                        
+                                gl.uniform3f(shaderProgram.Ka_Uniform, mat.Ka[0], mat.Ka[1], mat.Ka[2]);
+                                gl.uniform3f(shaderProgram.Kd_Uniform, mat.Kd[0], mat.Kd[1], mat.Kd[2]);
+                                gl.uniform3f(shaderProgram.Ks_Uniform, mat.Ks[0], mat.Ks[1], mat.Ks[2]);
+                                gl.uniform1f(shaderProgram.shininess_Uniform, mat.shininess);
 
-                            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh_toDraw.VertexIndexBuffer);
-                            sendMatricesToShader();
-                            gl.drawElements(gl.TRIANGLES, mesh_toDraw.VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-                            mvPopMatrix();
-                            mvPushMatrix();
+                                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh_toDraw.VertexIndexBuffer);
+                                sendMatricesToShader();
+                                gl.drawElements(gl.TRIANGLES, mesh_toDraw.VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+                                mvPopMatrix();
+                                mvPushMatrix();
+                            }
                         }
                     }
                 }
             }
 //#endregion
-
 //#region Input
             //inputs
                 //key inputs
@@ -476,40 +641,26 @@ var GameObjects_HTMLEmement;
                 //dragElement(MeshesLoaded_HTMLEmement);
                 //dragElement(GameObjects_HTMLEmement);
 
-                document.getElementById("input_number").value = 0.5;
-
-                var inputContainer = document.createElement("input_test");
-                var inputText = document.createElement("InputText").appendChild(document.createTextNode("X: "));
-                var createInput = document.createElement("INPUT");
-                createInput.setAttribute("type","number");
-                createInput.setAttribute("step","0.01");
-                createInput.value = 3.65;
-                inputContainer.innerHTML = "X: "
-                inputContainer.appendChild(createInput);
-                document.getElementById("overlay").appendChild(inputContainer);
-
                 initGL(canvas);
                 initShaders();
 
-                var teapot = AddGo("GO Teapot");
-                SceneGameObjects[teapot].mesh = "teapot";
-                loadModel("Assets/models/Teapot.json", SceneGameObjects[teapot].mesh);
-                SceneGameObjects[teapot].material = Material_Copper;
-                SceneGameObjects[teapot].transform = new transform();
-                SceneGameObjects[teapot].transform.position = [-5.0,0.0,-10.0];
-                SceneGameObjects[teapot].transform.scale = [0.25, 0.25,0.25];
-                SceneGameObjects[teapot].transform.CalcualteModelMatrix();
-
-                var laptop = AddGo("GO Laptop");
-                SceneGameObjects[laptop].mesh = "laptop";
-                loadModel("Assets/models/Laptop.json", SceneGameObjects[laptop].mesh);
-                SceneGameObjects[laptop].material = Material_CyanPlastic;
-                SceneGameObjects[laptop].transform = new transform();
-                SceneGameObjects[laptop].transform.position = [5.0,-1.0,-10.0];
-                SceneGameObjects[laptop].transform.rotateVector = [1.0, 0.0, 0.0];
-                SceneGameObjects[laptop].transform.rotateAngle = -90;
-                SceneGameObjects[laptop].transform.scale = [3.0, 3.0, 3.0];
-                SceneGameObjects[laptop].transform.CalcualteModelMatrix();
+                var mesh = "teapot";
+                var TRS = new transform();
+                TRS.position = [-5.0,0.0,-10.0];
+                TRS.scale = [0.25, 0.25, 0.25];
+                TRS.CalcualteModelMatrix();
+                AddGo("GO Teapot", TRS, mesh, Material_Copper);
+                loadModel("Assets/models/Teapot.json", mesh);
+                
+                TRS = new transform();
+                TRS.position = [5.0,-1.0,-10.0];
+                TRS.rotateVector = [1.0, 0.0, 0.0];
+                TRS.rotateAngle = -90;
+                TRS.scale = [3.0, 3.0, 3.0];
+                TRS.CalcualteModelMatrix();
+                mesh = "laptop";
+                AddGo("GO Laptop", TRS, mesh, Material_CyanPlastic);
+                loadModel("Assets/models/Laptop.json", mesh);
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
                 gl.enable(gl.DEPTH_TEST);
@@ -584,13 +735,6 @@ var GameObjects_HTMLEmement;
         <style type="text/css">
             .container {
                 position: relative;
-            }
-            #overlay {
-                position: absolute;
-                left: 10px;
-                top: 10px;
-                color:blue;
-                background: beige;
             }
             #ResourcesMesh {
             position: absolute;
@@ -669,9 +813,6 @@ var GameObjects_HTMLEmement;
     <body onload="webGLStart();" onresize="ScreenChanged();">
         <div class="container">
             <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
-            <div id="overlay">
-                Test number input: <input id="input_number" type="number" step="0.01" name="fname"><br>
-            </div>
             <div id="ResourcesMesh">
                 <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
                 <div id="ResourcesMeshheader">Resources Mesh Loaded</div>
