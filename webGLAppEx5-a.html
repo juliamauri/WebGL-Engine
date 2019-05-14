@@ -174,7 +174,7 @@
 
             function loadModel(){
                 var request = new XMLHttpRequest();
-                request.open("GET", "models/Teapot.json");
+                request.open("GET", "Assets/models/Teapot.json");
                 request.onreadystatechange = function(){
                     if(request.readyState == 4){
                         handleLoadedModel(JSON.parse(request.responseText));

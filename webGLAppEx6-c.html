@@ -5,11 +5,11 @@
 
         <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
         <script type="text/javascript" src="webgl-utils.js"></script>
-        <script type="text/javascript" src="Materials.js"></script>
-        <script type="text/javascript" src="Light.js"></script>
-        <script type="text/javascript" src="Transform.js"></script>
-        <script type="text/javascript" src="ResourceMesh.js"></script>
-        <script type="text/javascript" src="GameObject.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Materials.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Light.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Transform.js"></script>
+        <script type="text/javascript" src="ObjectScripts/ResourceMesh.js"></script>
+        <script type="text/javascript" src="ObjectScripts/GameObject.js"></script>
 
         <script id="shader-vs" type="x-shader/x-vertex">
             attribute vec3 aVertexPosition;
@@ -247,6 +247,9 @@
 
                 MeshesLoaded[name] = toFill;
                 load_items--;
+
+                var MeshesLoadedtext = document.createTextNode("\n" +name +",");
+                MeshesLoaded.appendChild(MeshesLoadedtext);
             }
 
             function loadModel(location, name){
@@ -306,7 +309,7 @@
                             mvPushMatrix();
                         }
                     }
-                } 
+                }
             }
 //#endregion
 
@@ -420,7 +423,8 @@
                 lastMouseY = newY;
             }
 // #endregion
-
+var overlay;
+var MeshesLoaded;
 //#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
@@ -441,12 +445,23 @@
                 document.onmousemove = handleMouseMove;
                 document.onwheel = handleWheel;
 
+                overlay = document.getElementById("overlay");
+                MeshesLoaded = document.createElement("MeshesLoaded");
+                var MeshesLoadedtext = document.createTextNode("Meshes Loaded: ");
+                MeshesLoaded.appendChild(MeshesLoadedtext);
+
+                overlay.appendChild(MeshesLoaded);
+
+                dragElement(document.getElementById("mydiv"));
+
+
+
                 initGL(canvas);
                 initShaders();
 
                 var teapot = AddGo("GO Teapot");
                 SceneGameObjects[teapot].mesh = "teapot";
-                loadModel("models/Teapot.json", SceneGameObjects[teapot].mesh);
+                loadModel("Assets/models/Teapot.json", SceneGameObjects[teapot].mesh);
                 SceneGameObjects[teapot].material = Material_Copper;
                 SceneGameObjects[teapot].transform = new transform();
                 SceneGameObjects[teapot].transform.position = [-5.0,0.0,-10.0];
@@ -455,7 +470,7 @@
 
                 var laptop = AddGo("GO Laptop");
                 SceneGameObjects[laptop].mesh = "laptop";
-                loadModel("models/Laptop.json", SceneGameObjects[laptop].mesh);
+                loadModel("Assets/models/Laptop.json", SceneGameObjects[laptop].mesh);
                 SceneGameObjects[laptop].material = Material_CyanPlastic;
                 SceneGameObjects[laptop].transform = new transform();
                 SceneGameObjects[laptop].transform.position = [5.0,-1.0,-10.0];
@@ -472,12 +487,99 @@
                 renderingLoop();
             }
 //#endregion
+
+//#region draggable html element
+            // Make the DIV element draggable:
+            function dragElement(elmnt) {
+                var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+                if (document.getElementById(elmnt.id + "header")) {
+                    // if present, the header is where you move the DIV from:
+                    document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
+                } else {
+                    // otherwise, move the DIV from anywhere inside the DIV:
+                    elmnt.onmousedown = dragMouseDown;
+                }
+
+                function dragMouseDown(e) {
+                    e = e || window.event;
+                    e.preventDefault();
+                    // get the mouse cursor position at startup:
+                    pos3 = e.clientX;
+                    pos4 = e.clientY;
+                    document.onmouseup = closeDragElement;
+                    // call a function whenever the cursor moves:
+                    document.onmousemove = elementDrag;
+                }
+
+                function elementDrag(e) {
+                    e = e || window.event;
+                    e.preventDefault();
+                    // calculate the new cursor position:
+                    pos1 = pos3 - e.clientX;
+                    pos2 = pos4 - e.clientY;
+                    pos3 = e.clientX;
+                    pos4 = e.clientY;
+                    // set the element's new position:
+                    elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                    elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                }
+
+                function closeDragElement() {
+                    // stop moving when mouse button is released:
+                    document.onmouseup = null;
+                    document.onmousemove = null;
+                }
+            }
+//#endregion
+
         </script>
+
+        <style type="text/css">
+            .container {
+                position: relative;
+            }
+            #overlay {
+                position: absolute;
+                left: 10px;
+                top: 10px;
+                color:blue;
+                background: beige;
+            }
+            #mydiv {
+            position: absolute;
+            left: 10px;
+            top: 60px;
+            z-index: 9;
+            background-color: #f1f1f1;
+            border: 1px solid #d3d3d3;
+            text-align: center;
+            }
+
+            #mydivheader {
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            background-color: #2196F3;
+            color: #fff;
+            }
+        </style >
 
     </head>
 
     <body onload="webGLStart();" onresize="webGLStart();">
-        <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
+        <div class="container">
+            <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
+            <div id="overlay">
+                Test number input: <input type="number" name="fname"><br>
+            </div>
+            <div id="mydiv">
+                <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
+                <div id="mydivheader">Click here to move</div>
+                <p>Move</p>
+                <p>this</p>
+                <p>DIV</p>
+              </div>
+        </div>
     </body>
 
 </html>
