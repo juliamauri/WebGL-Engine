@@ -157,10 +157,8 @@
                 recalculate_camera = true;
             }
 //#endregion
-
 //#region Shaders
             var shaderProgram;
-
             function initShaders() {
                 var fragmentShader = getShader("shader-fs");
                 var vertexShader = getShader("shader-vs");
@@ -198,16 +196,6 @@
                 //precalculating variables that will never change
                 mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
-                var defLight = new light();
-                defLight.material = Material_WhitePlastic;
-                defLight.position = [ 1.0, 0.5, 0.0 ];
-
-                gl.uniform3f(shaderProgram.Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
-                gl.uniform3f(shaderProgram.Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
-                gl.uniform3f(shaderProgram.Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
-
-                gl.uniform3f(shaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
-
                 recalculate_camera = true;
             }
 
@@ -219,6 +207,78 @@
                 mat4.toInverseMat3(mvMatrix, normalMatrix);
                 mat3.transpose(normalMatrix);
                 gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
+            }
+//#endregion
+//#region Lights
+var defLight
+            function initLights(){
+                defLight = new light();
+                defLight.material = MaterialsLoaded["WhitePlastic"];
+                defLight.position = [ 1.0, 0.5, 0.0 ];
+
+                var content_light = document.createElement("div");
+                content_light.appendChild(document.createTextNode("Position:"));
+
+                var inputContainer = document.createElement("div");
+                var createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.value = defLight.position[0];
+                createInput.addEventListener("change", function(){
+                    defLight.position[0] = this.value;
+                    gl.uniform3f(shaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_light.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.value = defLight.position[1];
+                createInput.addEventListener("change", function(){
+                    defLight.position[1] = this.value;
+                    gl.uniform3f(shaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_light.appendChild(inputContainer);
+
+                var inputContainer = document.createElement("div");
+                var createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.value = defLight.position[2];
+                createInput.addEventListener("change", function(){
+                    defLight.position[2] = this.value;
+                    gl.uniform3f(shaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_light.appendChild(inputContainer);
+
+                content_light.appendChild(document.createTextNode("Material:"));
+                content_light.appendChild(document.createElement("br"));
+                var selectMaterial = MaterialsList_HTMLElement.cloneNode(true);
+                selectMaterial.style.display = "block";
+                selectMaterial.value = "WhitePlastic";
+                selectMaterial.addEventListener("change", function(){
+                    defLight.material = MaterialsLoaded[this.value];
+                    gl.uniform3f(shaderProgram.Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
+                    gl.uniform3f(shaderProgram.Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
+                    gl.uniform3f(shaderProgram.Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
+                });
+                content_light.appendChild(selectMaterial);
+
+                Lights_HTMLEmement.appendChild(content_light);
+
+                gl.uniform3f(shaderProgram.Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
+                gl.uniform3f(shaderProgram.Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
+                gl.uniform3f(shaderProgram.Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
+
+                gl.uniform3f(shaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+
             }
 //#endregion
 
@@ -627,6 +687,7 @@ var canvas;
 var MeshesLoaded_HTMLEmement;
 var GameObjects_HTMLEmement;
 var MaterialsList_HTMLElement;
+var Lights_HTMLEmement;
 //#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
@@ -649,6 +710,7 @@ var MaterialsList_HTMLElement;
 
                 MeshesLoaded_HTMLEmement = document.getElementById("ResourcesMesh");
                 GameObjects_HTMLEmement = document.getElementById("GameObjects");
+                Lights_HTMLEmement = document.getElementById("Lights");
 
                 MaterialsList_HTMLElement = document.createElement("select")
                 MaterialsList_HTMLElement.setAttribute("name", "Materials");
@@ -666,6 +728,7 @@ var MaterialsList_HTMLElement;
 
                 initGL(canvas);
                 initShaders();
+                initLights();
 
                 var mesh = "teapot";
                 var TRS = new transform();
@@ -794,6 +857,24 @@ var MaterialsList_HTMLElement;
             color: #fff;
             }
 
+            #Lights {
+            position: absolute;
+            right: 225px;
+            top: 10px;
+            z-index: 9;
+            background-color: #f1f1f1;
+            border: 1px solid #d3d3d3;
+            text-align: center;
+            }
+
+            #Lightsheader {
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            background-color: #2196F3;
+            color: #fff;
+            }
+
             .collapsible {
               background-color: #777;
               color: white;
@@ -838,6 +919,10 @@ var MaterialsList_HTMLElement;
             <div id="ResourcesMesh">
                 <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
                 <div id="ResourcesMeshheader">Resources Mesh Loaded</div>
+            </div>
+            <div id="Lights">
+                <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
+                <div id="Lightsheader">Light</div>
             </div>
             <div id="GameObjects">
                 <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
