@@ -106,8 +106,7 @@
             
                 return shader;
             }
-//#endregion
-            
+//#endregion      
 //#region Matrices
             //Matrices
             var mvMatrixStack = []; //store view of camera
@@ -131,7 +130,6 @@
                 return angle * Math.PI / 180
             }
 //#endregion
-
 //#region Camera
             //Camera values
             var recalculate_camera = false;
@@ -216,6 +214,7 @@ var defLight
                 defLight.material = MaterialsLoaded["WhitePlastic"];
                 defLight.position = [ 1.0, 0.5, 0.0 ];
 
+//#region Lights HTTML Content
                 var content_light = document.createElement("div");
                 content_light.appendChild(document.createTextNode("Position:"));
 
@@ -272,7 +271,7 @@ var defLight
                 content_light.appendChild(selectMaterial);
 
                 Lights_HTMLEmement.appendChild(content_light);
-
+//#endregion
                 gl.uniform3f(shaderProgram.Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
                 gl.uniform3f(shaderProgram.Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
                 gl.uniform3f(shaderProgram.Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
@@ -281,7 +280,6 @@ var defLight
 
             }
 //#endregion
-
 //#region LoadingModels
             var load_items = 0;
             function handleLoadedModel(modelData, name){
@@ -326,7 +324,6 @@ var defLight
                 load_items++;
             }
 //#endregion
-
 //#region Scene
             var SceneGameObjects = [];
 
@@ -340,7 +337,7 @@ var defLight
                 var Go = new GameObject(name, TRS, mesh, MaterialsLoaded[material]);
                 var retId = SceneGameObjects.length;
                 SceneGameObjects.push(Go);
-//#region Html Content
+//#region GOHtml Content
                 var go_button = document.createElement("button");
                 go_button.setAttribute("class","collapsible");
                 go_button.innerHTML += name;
@@ -683,12 +680,12 @@ var defLight
                 lastMouseY = newY;
             }
 // #endregion
+//#region Main
 var canvas;
 var MeshesLoaded_HTMLEmement;
 var GameObjects_HTMLEmement;
 var MaterialsList_HTMLElement;
 var Lights_HTMLEmement;
-//#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
                 if(recalculate_camera){
@@ -815,7 +812,6 @@ var Lights_HTMLEmement;
                 }
             }
 //#endregion
-
         </script>
         <style type="text/css">
             .container {
