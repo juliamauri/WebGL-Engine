@@ -450,10 +450,7 @@
                 selectMaterial.value = material;
                 selectMaterial.addEventListener("change", function(){
                     var id = this.getAttribute("idGO");
-                    console.log(id);
-                    if(id != -1){
                         SceneGameObjects[id].material = MaterialsLoaded[this.value];
-                    }
                 });
                 content_go.appendChild(selectMaterial);
 
