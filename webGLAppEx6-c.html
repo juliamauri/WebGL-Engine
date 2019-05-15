@@ -277,7 +277,7 @@
                     TRS.CalcualteModelMatrix();
                 }
 
-                var Go = new GameObject(name, TRS, mesh, material);
+                var Go = new GameObject(name, TRS, mesh, MaterialsLoaded[material]);
                 var retId = SceneGameObjects.length;
                 SceneGameObjects.push(Go);
 //#region Html Content
@@ -287,7 +287,7 @@
                 var content_go = document.createElement("div");
                 content_go.setAttribute("class","content");
                 content_go.appendChild(document.createTextNode("Transform:"));
-                content_go.innerHTML += "<br/>";
+                content_go.appendChild(document.createElement("br"));
 
                 content_go.appendChild(document.createTextNode("Position:"));
                 var inputContainer = document.createElement("div");
@@ -441,6 +441,21 @@
                 inputContainer.innerHTML = "Z: ";
                 inputContainer.appendChild(createInput);
                 content_go.appendChild(inputContainer);
+
+                content_go.appendChild(document.createTextNode("Material:"));
+                content_go.appendChild(document.createElement("br"));
+                var selectMaterial = MaterialsList_HTMLElement.cloneNode(true);
+                selectMaterial.setAttribute("idGO",String(retId));
+                selectMaterial.style.display = "block";
+                selectMaterial.value = material;
+                selectMaterial.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    console.log(id);
+                    if(id != -1){
+                        SceneGameObjects[id].material = MaterialsLoaded[this.value];
+                    }
+                });
+                content_go.appendChild(selectMaterial);
 
                 GameObjects_HTMLEmement.appendChild(go_button);
                 GameObjects_HTMLEmement.appendChild(content_go);
@@ -614,6 +629,7 @@
 var canvas;
 var MeshesLoaded_HTMLEmement;
 var GameObjects_HTMLEmement;
+var MaterialsList_HTMLElement;
 //#region Main
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
@@ -637,6 +653,16 @@ var GameObjects_HTMLEmement;
                 MeshesLoaded_HTMLEmement = document.getElementById("ResourcesMesh");
                 GameObjects_HTMLEmement = document.getElementById("GameObjects");
 
+                MaterialsList_HTMLElement = document.createElement("select")
+                MaterialsList_HTMLElement.setAttribute("name", "Materials");
+                for(var str in MaterialsLoaded)
+                {
+                    var option = document.createElement("option");
+                    option.setAttribute("value", str);
+                    option.appendChild(document.createTextNode(str));
+                    MaterialsList_HTMLElement.appendChild(option);
+                }
+
                 //when drag scene blocked
                 //dragElement(MeshesLoaded_HTMLEmement);
                 //dragElement(GameObjects_HTMLEmement);
@@ -649,7 +675,7 @@ var GameObjects_HTMLEmement;
                 TRS.position = [-5.0,0.0,-10.0];
                 TRS.scale = [0.25, 0.25, 0.25];
                 TRS.CalcualteModelMatrix();
-                AddGo("GO Teapot", TRS, mesh, Material_Copper);
+                AddGo("GO Teapot", TRS, mesh, "Copper");
                 loadModel("Assets/models/Teapot.json", mesh);
                 
                 TRS = new transform();
@@ -659,7 +685,7 @@ var GameObjects_HTMLEmement;
                 TRS.scale = [3.0, 3.0, 3.0];
                 TRS.CalcualteModelMatrix();
                 mesh = "laptop";
-                AddGo("GO Laptop", TRS, mesh, Material_CyanPlastic);
+                AddGo("GO Laptop", TRS, mesh, "CyanPlastic");
                 loadModel("Assets/models/Laptop.json", mesh);
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -731,7 +757,6 @@ var GameObjects_HTMLEmement;
 //#endregion
 
         </script>
-
         <style type="text/css">
             .container {
                 position: relative;
@@ -739,7 +764,7 @@ var GameObjects_HTMLEmement;
             #ResourcesMesh {
             position: absolute;
             left: 10px;
-            top: 120px;
+            top: 10px;
             z-index: 9;
             background-color: #f1f1f1;
             border: 1px solid #d3d3d3;
