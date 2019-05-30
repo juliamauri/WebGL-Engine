@@ -1,0 +1,1018 @@
+<html>
+    <head>
+        <title>WebGL Application</title>
+        <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+        <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+        <script type="text/javascript" src="webgl-utils.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Materials.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Light.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Transform.js"></script>
+        <script type="text/javascript" src="ObjectScripts/ResourceMesh.js"></script>
+        <script type="text/javascript" src="ObjectScripts/GameObject.js"></script>
+
+        <script id="light-vs" type="x-shader/x-vertex">
+            attribute vec3 aVertexPosition;
+
+            uniform mat4 uPMatrix;
+            uniform mat4 uMVMatrix;
+            
+            void main (void) {
+              gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+            }
+        </script>
+
+        <script id="light-fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            vec4 encodeFloat (float depth) {
+              const vec4 bitShift = vec4(
+                256 * 256 * 256,
+                256 * 256,
+                256,
+                1.0
+              );
+              const vec4 bitMask = vec4(
+                0,
+                1.0 / 256.0,
+                1.0 / 256.0,
+                1.0 / 256.0
+              );
+              vec4 comp = fract(depth * bitShift);
+              comp -= comp.xxyz * bitMask;
+              return comp;
+            }
+            
+            void main (void) {
+              gl_FragColor = encodeFloat(gl_FragCoord.z);
+            }
+        </script>
+
+        <script id="camera-vs" type="x-shader/x-vertex">
+            attribute vec3 aVertexPosition;
+            attribute vec3 aVertexNormal;
+
+            uniform mat4 uMVMatrix;
+            uniform mat4 uPMatrix;
+            uniform mat3 uNMatrix;
+
+            varying vec3 normalEye;
+            varying vec4 positionEye;
+
+            uniform mat4 lightMViewMatrix;
+            uniform mat4 lightProjectionMatrix;
+
+            const mat4 texUnitConverter = mat4(0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 
+            0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+
+            varying vec4 shadowPos;
+
+            void main(void) {
+                normalEye = normalize(uNMatrix * aVertexNormal);
+                positionEye = uMVMatrix * vec4(aVertexPosition, 1.0);
+
+                gl_Position = uPMatrix * positionEye;
+
+                shadowPos = texUnitConverter * lightProjectionMatrix *
+                lightMViewMatrix * vec4(aVertexPosition, 1.0);
+            }
+        </script>
+
+        <script id="camera-fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            uniform vec3 Ia, Id, Is; //light color
+            uniform vec3 Ka, Kd, Ks; //material color
+            uniform float shininess; //material color
+
+            uniform vec3 lightPositionEye; //light position
+
+            varying vec3 normalEye;
+            varying vec4 positionEye;
+            varying vec4 shadowPos;
+
+            uniform sampler2D depthColorTexture;
+            uniform float shadowDepthTextureSize;
+
+            float decodeFloat (vec4 color) {
+                const vec4 bitShift = vec4(
+                  1.0 / (256.0 * 256.0 * 256.0),
+                  1.0 / (256.0 * 256.0),
+                  1.0 / 256.0,
+                  1
+                );
+                return dot(color, bitShift);
+              }
+            
+            vec3 CalculateShadedColor() {
+                vec3 L = normalize(lightPositionEye - positionEye.xyz);
+                vec3 N = normalize(normalEye);
+                vec3 V = normalize(-positionEye.xyz);
+
+                float NdotL = max(dot(N, L), 0.0);
+
+                vec3 R = reflect(-L, N);
+                float RdotV = pow(max(dot(R, V), 0.0), shininess);
+
+                return Ka * Ia +  Kd * Id * NdotL + Ks * Is * RdotV;
+            }
+
+            void main(void) {
+                vec3 shadedColor = CalculateShadedColor();
+
+                vec3 fragmentDepth = shadowPos.xyz;
+                float shadowAcneRemover = 0.007;
+                fragmentDepth.z -= shadowAcneRemover;
+              
+                float texelSize = 1.0 / shadowDepthTextureSize;
+                float amountInLight = 0.0;
+              
+                for (int x = -1; x <= 1; x++) {
+                  for (int y = -1; y <= 1; y++) {
+                    float texelDepth = decodeFloat(texture2D(depthColorTexture,
+                    fragmentDepth.xy + vec2(x, y) * texelSize));
+                    if (fragmentDepth.z < texelDepth) {
+                      amountInLight += 1.0;
+                    }
+                  }
+                }
+                amountInLight /= 9.0;              
+                
+                gl_FragColor = vec4(amountInLight * shadedColor,1.0);
+            }
+        </script>
+
+        <script type="text/javascript">
+//#region GL Basics Load
+            var gl;
+            function initGL(canvas) {
+                try {
+                    gl = canvas.getContext("experimental-webgl");
+                    gl.viewportWidth = canvas.width;
+                    gl.viewportHeight = canvas.height;
+                } catch (e) {
+                }
+                if (!gl) {
+                    alert("Could not initialise WebGL, sorry :-(");
+                }
+            }
+
+            function getShader(id) {
+                var shaderScript = document.getElementById(id);
+                if (!shaderScript) {
+                    return null;
+                }
+
+                var str = "";
+                var k = shaderScript.firstChild;
+                while (k) {
+                    if (k.nodeType == 3) {
+                        str += k.textContent;
+                    }
+                    k = k.nextSibling;
+                }
+
+                var shader;
+                if (shaderScript.type == "x-shader/x-fragment") {
+                    shader = gl.createShader(gl.FRAGMENT_SHADER);
+                } else if (shaderScript.type == "x-shader/x-vertex") {
+                    shader = gl.createShader(gl.VERTEX_SHADER);
+                } else {
+                    return null;
+                }
+
+                gl.shaderSource(shader, str);
+                gl.compileShader(shader);
+
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    alert(gl.getShaderInfoLog(shader));
+                    return null;
+                }
+            
+                return shader;
+            }
+//#endregion      
+//#region Matrices
+            //Matrices
+            var mvMatrixStack = []; //store view of camera
+            var mvMatrix = mat4.create(); //model view
+            var pMatrix = mat4.create(); //projection
+
+            function mvPushMatrix(){
+                var copy = mat4.create();
+                mat4.set(mvMatrix, copy);
+                mvMatrixStack.push(copy);
+            }
+
+            function mvPopMatrix(){
+                if(mvMatrixStack.length > 0){
+                    mvMatrix = mvMatrixStack.pop();
+                }
+            }
+
+            //degtorad
+            function deg2Rad(angle){
+                return angle * Math.PI / 180
+            }
+//#endregion
+//#region Camera
+            //Camera values
+            var recalculate_camera = false;
+            var dist = 0;
+            var translate_camera = [ 0, 0, 0];
+            var mouseRotationMatrix = mat4.create();
+            mat4.identity(mouseRotationMatrix);
+
+            function calculateCamera(){
+                mvPopMatrix();
+                mat4.identity(mvMatrix);
+                mat4.translate(mvMatrix, translate_camera);
+                mat4.multiply(mvMatrix, mouseRotationMatrix);
+                mvPushMatrix();
+                recalculate_camera = false;
+            }
+
+            //function key associated
+            function ResetCamera(){
+                dist = 0;
+                mat4.identity(mouseRotationMatrix);
+                translate_camera = [0.0,0.0,0.0];
+                recalculate_camera = true;
+            }
+//#endregion
+//#region Shaders
+            var cameraShaderProgram;
+            var shadowDepthTextureSize = 2048;
+            function initShaders() {
+                console.log("1");
+                var cameraFragmentShader  = getShader("camera-fs");
+                console.log("2");
+                var cameraVertexShader  = getShader("camera-vs");
+
+                cameraShaderProgram  = gl.createProgram();
+                gl.attachShader(cameraShaderProgram , cameraVertexShader );
+                gl.attachShader(cameraShaderProgram , cameraFragmentShader );
+                gl.linkProgram(cameraShaderProgram );
+
+                if (!gl.getProgramParameter(cameraShaderProgram , gl.LINK_STATUS)) {
+                    alert("Could not initialise shaders");
+                }
+
+                gl.useProgram(cameraShaderProgram );
+
+                cameraShaderProgram .vertexPositionAttribute = gl.getAttribLocation(cameraShaderProgram , "aVertexPosition");
+                gl.enableVertexAttribArray(cameraShaderProgram .vertexPositionAttribute);
+                cameraShaderProgram .vertexNormalAttribute = gl.getAttribLocation(cameraShaderProgram , "aVertexNormal");
+                gl.enableVertexAttribArray(cameraShaderProgram .vertexNormalAttribute);
+
+                cameraShaderProgram .pMatrixUniform = gl.getUniformLocation(cameraShaderProgram , "uPMatrix");
+                cameraShaderProgram .mvMatrixUniform = gl.getUniformLocation(cameraShaderProgram , "uMVMatrix");
+                cameraShaderProgram .nMatrixUniform = gl.getUniformLocation(cameraShaderProgram , "uNMatrix");
+
+                cameraShaderProgram .Ia_Uniform = gl.getUniformLocation(cameraShaderProgram , "Ia");
+                cameraShaderProgram .Id_Uniform = gl.getUniformLocation(cameraShaderProgram , "Id");
+                cameraShaderProgram .Is_Uniform = gl.getUniformLocation(cameraShaderProgram , "Is");
+                cameraShaderProgram .lightPositionEye_Uniform = gl.getUniformLocation(cameraShaderProgram , "lightPositionEye");
+
+                cameraShaderProgram .Ka_Uniform = gl.getUniformLocation(cameraShaderProgram , "Ka");
+                cameraShaderProgram .Kd_Uniform = gl.getUniformLocation(cameraShaderProgram , "Kd");
+                cameraShaderProgram .Ks_Uniform = gl.getUniformLocation(cameraShaderProgram , "Ks");
+                cameraShaderProgram .shininess_Uniform = gl.getUniformLocation(cameraShaderProgram , "shininess");
+
+                //precalculating variables that will never change
+                mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+                recalculate_camera = true;
+            }
+
+            function sendMatricesToShader() {
+                gl.uniformMatrix4fv(cameraShaderProgram .pMatrixUniform, false, pMatrix);
+                gl.uniformMatrix4fv(cameraShaderProgram .mvMatrixUniform, false, mvMatrix);
+
+                var normalMatrix = mat3.create();
+                mat4.toInverseMat3(mvMatrix, normalMatrix);
+                mat3.transpose(normalMatrix);
+                gl.uniformMatrix3fv(cameraShaderProgram .nMatrixUniform, false, normalMatrix);
+            }
+//#endregion
+//#region Lights
+var defLight
+            function initLights(){
+                defLight = new light();
+                defLight.material = MaterialsLoaded["WhitePlastic"];
+                defLight.position = [ 1.0, 0.5, 0.0 ];
+
+//#region Lights HTTML Content
+                var content_light = document.createElement("div");
+                content_light.appendChild(document.createTextNode("Position:"));
+
+                var inputContainer = document.createElement("div");
+                var createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.value = defLight.position[0];
+                createInput.addEventListener("change", function(){
+                    defLight.position[0] = this.value;
+                    gl.uniform3f(cameraShaderProgram .lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_light.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.value = defLight.position[1];
+                createInput.addEventListener("change", function(){
+                    defLight.position[1] = this.value;
+                    gl.uniform3f(cameraShaderProgram .lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_light.appendChild(inputContainer);
+
+                var inputContainer = document.createElement("div");
+                var createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.value = defLight.position[2];
+                createInput.addEventListener("change", function(){
+                    defLight.position[2] = this.value;
+                    gl.uniform3f(cameraShaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_light.appendChild(inputContainer);
+
+                content_light.appendChild(document.createTextNode("Material:"));
+                content_light.appendChild(document.createElement("br"));
+                var selectMaterial = MaterialsList_HTMLElement.cloneNode(true);
+                selectMaterial.style.display = "block";
+                selectMaterial.value = "WhitePlastic";
+                selectMaterial.addEventListener("change", function(){
+                    defLight.material = MaterialsLoaded[this.value];
+                    gl.uniform3f(cameraShaderProgram .Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
+                    gl.uniform3f(cameraShaderProgram .Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
+                    gl.uniform3f(cameraShaderProgram .Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
+                });
+                content_light.appendChild(selectMaterial);
+
+                Lights_HTMLEmement.appendChild(content_light);
+//#endregion
+                gl.uniform3f(cameraShaderProgram .Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
+                gl.uniform3f(cameraShaderProgram .Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
+                gl.uniform3f(cameraShaderProgram .Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
+
+                gl.uniform3f(cameraShaderProgram .lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+
+            }
+//#endregion
+//#region LoadingModels
+            var load_items = 0;
+            function handleLoadedModel(modelData, name){
+                var toFill = new ResourceMesh();
+                toFill.VertexPositionBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexPositionBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexPositions), gl.STATIC_DRAW);
+                toFill.VertexPositionBuffer.itemSize = 3;
+                toFill.VertexPositionBuffer.numItems = modelData.vertexPositions.length / 3;
+
+                toFill.VertexNormalBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexNormalBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexNormals), gl.STATIC_DRAW);
+                toFill.VertexNormalBuffer.itemSize = 3;
+                toFill.VertexNormalBuffer.numItems = modelData.vertexNormals.length / 3;
+
+                toFill.VertexIndexBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, toFill.VertexIndexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(modelData.indices), gl.STATIC_DRAW);
+                toFill.VertexIndexBuffer.itemSize = 1;
+                toFill.VertexIndexBuffer.numItems = modelData.indices.length;
+
+                MeshesLoaded[name] = toFill;
+                load_items--;
+
+                var MeshesLoadedtext = document.createTextNode(name);
+                var NodeMesh = document.createElement(name+"Mesh");
+                NodeMesh.appendChild(MeshesLoadedtext);
+                NodeMesh.innerHTML += "<br/>";
+                MeshesLoaded_HTMLEmement.appendChild(NodeMesh);
+            }
+
+            function loadModel(location, name){
+                var request = new XMLHttpRequest();
+                request.open("GET", location);
+                request.onreadystatechange = function(){
+                    if(request.readyState == 4){
+                        handleLoadedModel(JSON.parse(request.responseText), name);
+                    }
+                }
+                request.send();
+                load_items++;
+            }
+//#endregion
+//#region Scene
+            var SceneGameObjects = [];
+
+            function AddGo(name, TRS, mesh, material){
+
+                if(TRS == null){
+                    TRS = new transform();
+                    TRS.CalcualteModelMatrix();
+                }
+
+                var Go = new GameObject(name, TRS, mesh, MaterialsLoaded[material]);
+                var retId = SceneGameObjects.length;
+                SceneGameObjects.push(Go);
+//#region GOHtml Content
+                var go_button = document.createElement("button");
+                go_button.setAttribute("class","collapsible");
+                go_button.innerHTML += name;
+                var content_go = document.createElement("div");
+                content_go.setAttribute("class","content");
+                content_go.appendChild(document.createTextNode("Transform:"));
+                content_go.appendChild(document.createElement("br"));
+
+                content_go.appendChild(document.createTextNode("Position:"));
+                var inputContainer = document.createElement("div");
+                var createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.position[0];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.position[0] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.position[1];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.position[1] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.position[2];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.position[2] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                content_go.appendChild(document.createTextNode("Rotation:"));
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateVector[0];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateVector[0] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateVector[1];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateVector[1] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateVector[2];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateVector[2] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.rotateAngle;
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.rotateAngle = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "º: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                content_go.appendChild(document.createTextNode("Scale:"));
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.scale[0];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.scale[0] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "X: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.scale[1];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.scale[1] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Y: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                inputContainer = document.createElement("div");
+                createInput = document.createElement("input");
+                createInput.setAttribute("type","number");
+                createInput.setAttribute("step","0.001");
+                createInput.setAttribute("idGO",String(retId));
+                createInput.value = TRS.scale[2];
+                createInput.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                    SceneGameObjects[id].transform.scale[2] = this.value;
+                    SceneGameObjects[id].transform.CalcualteModelMatrix();
+                });
+                inputContainer.innerHTML = "Z: ";
+                inputContainer.appendChild(createInput);
+                content_go.appendChild(inputContainer);
+
+                content_go.appendChild(document.createTextNode("Material:"));
+                content_go.appendChild(document.createElement("br"));
+                var selectMaterial = MaterialsList_HTMLElement.cloneNode(true);
+                selectMaterial.setAttribute("idGO",String(retId));
+                selectMaterial.style.display = "block";
+                selectMaterial.value = material;
+                selectMaterial.addEventListener("change", function(){
+                    var id = this.getAttribute("idGO");
+                        SceneGameObjects[id].material = MaterialsLoaded[this.value];
+                });
+                content_go.appendChild(selectMaterial);
+
+                GameObjects_HTMLEmement.appendChild(go_button);
+                GameObjects_HTMLEmement.appendChild(content_go);
+
+                go_button.addEventListener("click", function() {
+                    this.classList.toggle("active");
+                    var content = this.nextElementSibling;
+                    if (content.style.maxHeight){
+                    content.style.maxHeight = null;
+                    } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    } 
+                });
+  //#endregion
+                return retId;
+            }
+
+            function drawScene() {
+                gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                if(load_items == 0)
+                {
+                    for(i in SceneGameObjects)
+                    {
+                        var go = SceneGameObjects[i];
+                        if(go.mesh != ""){
+                            var mesh_toDraw = MeshesLoaded[go.mesh];
+                            var mat = go.material;
+                            if(mat == null){
+                                mat = Material_Emerland;
+                            }
+                            if(mesh_toDraw.VertexPositionBuffer)
+                            { 
+                                mat4.multiply(mvMatrix, go.transform.modelMatrix);
+                                
+                                gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexPositionBuffer);
+                                gl.vertexAttribPointer(cameraShaderProgram.vertexPositionAttribute, 
+                                                        mesh_toDraw.VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+                                
+                                                        gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexNormalBuffer);
+                                gl.vertexAttribPointer(cameraShaderProgram.vertexNormalAttribute, 
+                                                        mesh_toDraw.VertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);         
+                                                        
+                                gl.uniform3f(cameraShaderProgram.Ka_Uniform, mat.Ka[0], mat.Ka[1], mat.Ka[2]);
+                                gl.uniform3f(cameraShaderProgram.Kd_Uniform, mat.Kd[0], mat.Kd[1], mat.Kd[2]);
+                                gl.uniform3f(cameraShaderProgram.Ks_Uniform, mat.Ks[0], mat.Ks[1], mat.Ks[2]);
+                                gl.uniform1f(cameraShaderProgram.shininess_Uniform, mat.shininess);
+
+                                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh_toDraw.VertexIndexBuffer);
+                                sendMatricesToShader();
+                                gl.drawElements(gl.TRIANGLES, mesh_toDraw.VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+                                mvPopMatrix();
+                                mvPushMatrix();
+                            }
+                        }
+                    }
+                }
+            }
+//#endregion
+//#region Input
+            //inputs
+                //key inputs
+            function handleKeyDown(event){
+                if (event.defaultPrevented) {
+                    return; // Do nothing if the event was already processed
+                }
+
+                switch (event.key) {
+                    case "Down": // IE/Edge specific value
+                    case "ArrowDown":
+                        // Do something for "down arrow" key press.
+                        break;
+                    case "Up": // IE/Edge specific value
+                    case "ArrowUp":
+                        // Do something for "up arrow" key press.
+                        break;
+                    case "Left": // IE/Edge specific value
+                    case "ArrowLeft":
+                        // Do something for "left arrow" key press.
+                        break;
+                    case "Right": // IE/Edge specific value
+                    case "ArrowRight":
+                        // Do something for "right arrow" key press.
+                        break;
+                    case "Enter":
+                        // Do something for "enter" or "return" key press.
+                        break;
+                    case "Esc": // IE/Edge specific value
+                    case "Escape":
+                        // Do something for "esc" key press.
+                        break;
+                    case "r":
+                        ResetCamera();
+                        break;
+                    default:
+                        return; // Quit when this doesn't handle the key event.
+                }
+
+                // Cancel the default action to avoid it being handled twice
+                event.preventDefault();
+            }
+
+                //mouse wheel
+            function handleWheel(event){
+                event.preventDefault();
+                if(event.deltaY < 0)
+                    dist += 0.5;
+                if(event.deltaY > 0)
+                    dist -= 0.5;
+                translate_camera[2] = dist;
+                recalculate_camera = true;
+            }
+
+                //mouse
+            var lastMouseX = null;
+            var lastMouseY = null;
+            var mouseDown = false;
+            var wheelDown = false;
+            var leftDown = false;
+            function handleMouseDown(event){
+                event.preventDefault();
+                mouseDown = true;
+                if(event.button == 1){
+                    wheelDown = true;
+                }
+                if(event.button == 2){
+                    leftDown = true;
+                }
+                lastMouseX = event.clientX;
+                lastMouseY = event.clientY;
+            }
+            function handleMouseUp(event){
+                mouseDown = false;
+                if(event.button == 1){
+                    wheelDown = false;
+                }
+                if(event.button == 2){
+                    leftDown = false;
+                }
+            }
+            function handleMouseMove(event){
+                event.preventDefault();
+                if(!mouseDown){
+                    return;
+                }
+                var newX = event.clientX;
+                var newY = event.clientY;
+                var deltaX = newX - lastMouseX;
+                var deltaY = newY - lastMouseY;
+
+                if(wheelDown){
+                    translate_camera[0] += deltaX * 0.005;
+                    translate_camera[1] += deltaY * 0.005;
+                    recalculate_camera = true;
+                }
+
+                if(leftDown){
+                    var newRotationMatrix = mat4.create();
+                    mat4.identity(newRotationMatrix);
+                    mat4.rotate(newRotationMatrix, deg2Rad(deltaX / 10), [0,1,0]);
+                    mat4.rotate(newRotationMatrix, deg2Rad(deltaY / 10), [1,0,0]);
+                    mat4.multiply(newRotationMatrix, mouseRotationMatrix, mouseRotationMatrix);
+                    recalculate_camera = true;
+                }
+
+                lastMouseX = newX;
+                lastMouseY = newY;
+            }
+// #endregion
+//#region Main
+var canvas;
+var MeshesLoaded_HTMLEmement;
+var GameObjects_HTMLEmement;
+var MaterialsList_HTMLElement;
+var Lights_HTMLEmement;
+            function renderingLoop(){
+                requestAnimationFrame(renderingLoop);
+                if(recalculate_camera){
+                    calculateCamera();
+                }
+                drawScene();
+            }
+
+            function webGLStart() {
+                canvas = document.getElementById("webGL-canvas");
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                document.onkeydown = handleKeyDown;
+                canvas.onmousedown = handleMouseDown;
+                document.onmouseup = handleMouseUp;
+                document.onmousemove = handleMouseMove;
+                document.onwheel = handleWheel;
+
+                MeshesLoaded_HTMLEmement = document.getElementById("ResourcesMesh");
+                GameObjects_HTMLEmement = document.getElementById("GameObjects");
+                Lights_HTMLEmement = document.getElementById("Lights");
+
+                MaterialsList_HTMLElement = document.createElement("select")
+                MaterialsList_HTMLElement.setAttribute("name", "Materials");
+                for(var str in MaterialsLoaded)
+                {
+                    var option = document.createElement("option");
+                    option.setAttribute("value", str);
+                    option.appendChild(document.createTextNode(str));
+                    MaterialsList_HTMLElement.appendChild(option);
+                }
+
+                //when drag scene blocked
+                //dragElement(MeshesLoaded_HTMLEmement);
+                //dragElement(GameObjects_HTMLEmement);
+
+                initGL(canvas);
+                initShaders();
+                initLights();
+
+                var mesh = "teapot";
+                var TRS = new transform();
+                TRS.position = [-5.0,0.0,-10.0];
+                TRS.scale = [0.25, 0.25, 0.25];
+                TRS.CalcualteModelMatrix();
+                AddGo("GO Teapot", TRS, mesh, "Copper");
+                loadModel("Assets/models/Teapot.json", mesh);
+                
+                TRS = new transform();
+                TRS.position = [5.0,-1.0,-10.0];
+                TRS.rotateVector = [1.0, 0.0, 0.0];
+                TRS.rotateAngle = -90;
+                TRS.scale = [3.0, 3.0, 3.0];
+                TRS.CalcualteModelMatrix();
+                mesh = "laptop";
+                AddGo("GO Laptop", TRS, mesh, "CyanPlastic");
+                loadModel("Assets/models/Laptop.json", mesh);
+
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.enable(gl.DEPTH_TEST);
+                gl.enable(gl.CULL_FACE);
+                gl.cullFace(gl.BACK);
+
+                renderingLoop();
+            }
+
+            function ScreenChanged(){
+                canvas = document.getElementById("webGL-canvas");
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                initGL(canvas);
+                mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+                renderingLoop();
+            } 
+//#endregion
+
+//#region draggable html element
+            // Make the DIV element draggable:
+            function dragElement(elmnt) {
+                var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+                if (document.getElementById(elmnt.id + "header")) {
+                    // if present, the header is where you move the DIV from:
+                    document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
+                } else {
+                    // otherwise, move the DIV from anywhere inside the DIV:
+                    elmnt.onmousedown = dragMouseDown;
+                }
+
+                function dragMouseDown(e) {
+                    e = e || window.event;
+                    e.preventDefault();
+                    // get the mouse cursor position at startup:
+                    pos3 = e.clientX;
+                    pos4 = e.clientY
+                    document.onmouseup = closeDragElement;
+                    // call a function whenever the cursor moves:
+                    document.onmousemove = elementDrag;
+                }
+
+                function elementDrag(e) {
+                    e = e || window.event;
+                    e.preventDefault();
+                    // calculate the new cursor position:
+                    pos1 = pos3 - e.clientX;
+                    pos2 = pos4 - e.clientY;
+                    pos3 = e.clientX;
+                    pos4 = e.clientY;
+                    // set the element's new position:
+                    var set = elmnt.offsetTop - pos2;
+                    if(set < 10){
+                        set = 10;
+                    }
+                    elmnt.style.top = set + "px";
+                    //elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                    //elmnt.style.right = (elmnt.offsetRight + pos1) + "px";  
+                }
+
+                function closeDragElement() {
+                    // stop moving when mouse button is released:
+                    document.onmouseup = null;
+                    document.onmousemove = null;
+                }
+            }
+//#endregion
+        </script>
+        <style type="text/css">
+            .container {
+                position: relative;
+            }
+            #ResourcesMesh {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            z-index: 9;
+            background-color: #f1f1f1;
+            border: 1px solid #d3d3d3;
+            text-align: center;
+            }
+
+            #ResourcesMeshheader {
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            background-color: #2196F3;
+            color: #fff;
+            }
+
+            #GameObjects {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            z-index: 9;
+            background-color: #f1f1f1;
+            border: 1px solid #d3d3d3;
+            text-align: center;
+            }
+
+            #GameObjectsheader {
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            background-color: #2196F3;
+            color: #fff;
+            }
+
+            #Lights {
+            position: absolute;
+            right: 225px;
+            top: 10px;
+            z-index: 9;
+            background-color: #f1f1f1;
+            border: 1px solid #d3d3d3;
+            text-align: center;
+            }
+
+            #Lightsheader {
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            background-color: #2196F3;
+            color: #fff;
+            }
+
+            .collapsible {
+              background-color: #777;
+              color: white;
+              cursor: pointer;
+              padding: 18px;
+              width: 100%;
+              border: none;
+              text-align: left;
+              outline: none;
+              font-size: 15px;
+            }
+            
+            .active, .collapsible:hover {
+              background-color: #555;
+            }
+            
+            .collapsible:after {
+              content: '\002B';
+              color: white;
+              font-weight: bold;
+              float: right;
+              margin-left: 5px;
+            }
+            
+            .active:after {
+              content: "\2212";
+            }
+            
+            .content {
+              padding: 0 18px;
+              max-height: 0;
+              overflow: hidden;
+              transition: max-height 0.2s ease-out;
+              background-color: #f1f1f1;
+            }
+        </style >
+    </head>
+
+    <body onload="webGLStart();" onresize="ScreenChanged();">
+        <div class="container">
+            <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>
+            <div id="ResourcesMesh">
+                <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
+                <div id="ResourcesMeshheader">Resources Mesh Loaded</div>
+            </div>
+            <div id="Lights">
+                <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
+                <div id="Lightsheader">Light</div>
+            </div>
+            <div id="GameObjects">
+                <!-- Include a header DIV with the same name as the draggable DIV, followed by "header" -->
+                <div id="GameObjectsheader">GameObjects</div>
+            </div>
+        </div>
+    </body>
+
+</html>
