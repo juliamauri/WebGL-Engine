@@ -411,6 +411,51 @@ var defLight
                 request.send();
                 load_items++;
             }
+
+            function loadFloorModel(name){
+                var floorPositions = [
+                -30.0, 0.0, 30.0,
+                30.0, 0.0, 30.0,
+                30.0, 0.0, -30.0,
+                -30.0, 0.0, -30.0
+                ]
+                var floorNormal = [
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                0.0, 1.0, 0.0,
+                ]
+                var floorIndices = [
+                0, 1, 2, 0, 2, 3
+                ]
+
+                var toFill = new ResourceMesh();
+                toFill.VertexPositionBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexPositionBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(floorPositions), gl.STATIC_DRAW);
+                toFill.VertexPositionBuffer.itemSize = 3;
+                toFill.VertexPositionBuffer.numItems = 4;
+
+                toFill.VertexNormalBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, toFill.VertexNormalBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(floorNormal), gl.STATIC_DRAW);
+                toFill.VertexNormalBuffer.itemSize = 3;
+                toFill.VertexNormalBuffer.numItems = 4;
+
+
+                toFill.VertexIndexBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, toFill.VertexIndexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(floorIndices), gl.STATIC_DRAW);
+                toFill.VertexIndexBuffer.itemSize = 1;
+                toFill.VertexIndexBuffer.numItems = 6;
+                
+                MeshesLoaded[name] = toFill;
+
+                var MeshesLoadedtext = document.createTextNode(name);
+                var NodeMesh = document.createElement("div");
+                NodeMesh.appendChild(MeshesLoadedtext);
+                MeshesLoaded_HTMLEmement.appendChild(NodeMesh);
+            }
 //#endregion
 //#region Scene
             var SceneGameObjects = [];
@@ -832,6 +877,13 @@ var Lights_HTMLEmement;
                 mesh = "laptop";
                 AddGo("GO Laptop", TRS, mesh, "CyanPlastic");
                 loadModel("Assets/models/Laptop.json", mesh);
+
+                TRS = new transform();
+                TRS.position = [0.0,-1.5,-10.0];
+                TRS.CalcualteModelMatrix();
+                mesh = "floor";
+                AddGo("GO Floor", TRS, mesh, "WhitePlastic");
+                loadFloorModel(mesh);
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
                 gl.enable(gl.DEPTH_TEST);
