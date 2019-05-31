@@ -242,11 +242,8 @@
 //#endregion
 //#region Shaders
             var cameraShaderProgram;
-            var shadowDepthTextureSize = 2048;
             function initCameraShaders() {
-                console.log("1");
                 var cameraFragmentShader  = getShader("camera-fs");
-                console.log("2");
                 var cameraVertexShader  = getShader("camera-vs");
 
                 cameraShaderProgram  = gl.createProgram();
@@ -293,15 +290,20 @@
                 //precalculating variables that will never change
                 mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
+                gl.uniform1i(cameraShaderProgram .depthColorTexUniform, 0);
+                gl.uniform1i(cameraShaderProgram .shadowDepthTexSizeUniform, shadowDepthTextureSize);
+
+
                 recalculate_camera = true;
                 
             }
 
             var lightShaderProgram;
+            var lightDepthTexture;
+            var frameBufferLight;
+            var shadowDepthTextureSize = 2048;
             function initLightShaders(){
-                console.log("3");
                 var lightFragmentShader  = getShader("light-fs");
-                console.log("4");
                 var lightVertexShader  = getShader("light-vs");
 
                 lightShaderProgram  = gl.createProgram();
@@ -317,13 +319,40 @@
 
                 //Attributes
                 lightShaderProgram.vertexPositionAttribute = gl.getUniformLocation(lightShaderProgram, "aVertexPosition");
+                gl.enableVertexAttribArray(lightShaderProgram.vertexPositionAttribute);
 
                 //Uniforms
                 lightShaderProgram.pMatrixUniform = gl.getUniformLocation(lightShaderProgram , "uPMatrix");
                 lightShaderProgram.mvMatrixUniform = gl.getUniformLocation(lightShaderProgram , "uMVMatrix");
                 
-                initTextureFramebuffer();
+                //Init framebuffer and texture
+                frameBufferLight = gl.createFramebuffer();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, frameBufferLight)
+
+                lightDepthTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, lightDepthTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,
+                                shadowDepthTextureSize, shadowDepthTextureSize,
+                                0, gl.RGBA, gl.UNSIGNED_BYTE, null);
                 
+                var renderbuffer = gl.createRenderbuffer();
+                gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+                gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16,
+                shadowDepthTextureSize, shadowDepthTextureSize);
+
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                                        gl.TEXTURE_2D, lightDepthTexture, 0);
+                gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT,
+                                            gl.RENDERBUFFER, renderbuffer);
+                                            
+                                            
+                                            
+                initLights();
+                
+                gl.bindTexture(gl.TEXTURE_2D, null);
+                gl.bindRenderbuffer(gl.RENDERBUFFER, null);                
             }
 
             function sendMatricesToShader() {
@@ -336,47 +365,15 @@
                 gl.uniformMatrix3fv(cameraShaderProgram .nMatrixUniform, false, normalMatrix);
             }
 
-            //INIT TEXTURE FRAME BUFFER
-            var rttFramebuffer;
-            var rttTexture;
-
-            function initTextureFramebuffer() {
-                rttFramebuffer = gl.createFramebuffer();
-                gl.bindFramebuffer(gl.FRAMEBUFFER, rttFramebuffer)
-                rttFramebuffer.width = shadowDepthTextureSize;
-                rttFramebuffer.height = shadowDepthTextureSize;
-
-                rttTexture = gl.createTexture();
-                gl.bindTexture(gl.TEXTURE_2D, rttTexture);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,
-                                shadowDepthTextureSize, shadowDepthTextureSize,
-                                0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-
-                var renderbuffer = gl.createRenderbuffer();
-                gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
-                gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16,
-                shadowDepthTextureSize, shadowDepthTextureSize);
-
-                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-                                        gl.TEXTURE_2D, rttTexture, 0);
-                gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT,
-                                            gl.RENDERBUFFER, renderbuffer);
-
-                gl.bindTexture(gl.TEXTURE_2D, null);
-                gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            }
-
-
 //#endregion
 //#region Lights
-var defLight
+var defLight;
+var lightProjectionMatrix;
+var lightViewMatrix;
             function initLights(){
                 defLight = new light();
                 defLight.material = MaterialsLoaded["WhitePlastic"];
-                defLight.position = [ 1.0, 0.5, 0.0 ];
+                defLight.position = [ 0.0, 10.0, sceneCenterZ ];
 
 //#region Lights HTTML Content
                 var content_light = document.createElement("div");
@@ -436,12 +433,35 @@ var defLight
 
                 Lights_HTMLEmement.appendChild(content_light);
 //#endregion
+
+                lightProjectionMatrix = mat4.create();
+                lightViewMatrix = mat4.create();
+                mat4.ortho(lightProjectionMatrix, -40, 40, -40, 40, -40.0, 80);
+                mat4.lookAt(lightViewMatrix, defLight.position, [0, 0, sceneCenterZ], [1, 0, 0]);
+                
+                gl.uniformMatrix4fv(lightShaderProgram.pMatrixUniform, false, lightProjectionMatrix);
+                gl.uniformMatrix4fv(lightShaderProgram.mvMatrixUniform, false, lightViewMatrix);
+                
+                //Setting to lightShader
+                gl.bindBuffer(gl.ARRAY_BUFFER, MeshesLoaded["floor"].VertexPositionBuffer);
+                gl.vertexAttribPointer(lightShaderProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, MeshesLoaded["floor"].VertexIndexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(floorIndices), gl.STATIC_DRAW);
+
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);     
+
+                gl.useProgram(cameraShaderProgram);
                 gl.uniform3f(cameraShaderProgram .Ia_Uniform, defLight.material.Ka[0], defLight.material.Ka[1], defLight.material.Ka[2]);
                 gl.uniform3f(cameraShaderProgram .Id_Uniform, defLight.material.Kd[0], defLight.material.Kd[1], defLight.material.Kd[2]);
                 gl.uniform3f(cameraShaderProgram .Is_Uniform, defLight.material.Ks[0], defLight.material.Ks[1], defLight.material.Ks[2]);
 
                 gl.uniform3f(cameraShaderProgram .lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
 
+                gl.activeTexture(gl.TEXTURE0);
+                gl.uniform1i(cameraShaderProgram.depthColorTexUniform, 0);
+                gl.uniformMatrix4fv(cameraShaderProgram.lightpMatrixUniform, false, lightProjectionMatrix);
+                gl.uniformMatrix4fv(cameraShaderProgram.lightMVMatrixUniform, false, lightViewMatrix);
             }
 //#endregion
 //#region LoadingModels
@@ -488,22 +508,23 @@ var defLight
                 load_items++;
             }
 
+            var floorIndices;
             function loadFloorModel(name){
                 var floorPositions = [
                 -30.0, 0.0, 30.0,
                 30.0, 0.0, 30.0,
                 30.0, 0.0, -30.0,
                 -30.0, 0.0, -30.0
-                ]
+                ];
                 var floorNormal = [
                 0.0, 1.0, 0.0,
                 0.0, 1.0, 0.0,
                 0.0, 1.0, 0.0,
                 0.0, 1.0, 0.0,
-                ]
-                var floorIndices = [
+                ];
+                floorIndices = [
                 0, 1, 2, 0, 2, 3
-                ]
+                ];
 
                 var toFill = new ResourceMesh();
                 toFill.VertexPositionBuffer = gl.createBuffer();
@@ -738,22 +759,22 @@ var defLight
 
             //Draw Scene From Light
             function drawSceneFromLight(){
-                /*
-                gl.bindFramebuffer(gl.FRAMEBUFFER, rttFramebuffer);
                 
-                gl.viewport(0, 0, rttFramebuffer.width, rttFramebuffer.height);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                gl.useProgram(lightShaderProgram);
 
-                gl.useProgram(programLight);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, frameBufferLight);
+                
+                gl.viewport(0, 0, shadowDepthTextureSize, shadowDepthTextureSize);
+                gl.clearColor(0, 0, 0, 1)
+                gl.clearDepth(1.0)
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-                gl.enableVertexAttribArray(programLight.vertexPositionAttribute);
 
                 // Rendering code
 
-                gl.disableVertexAttribArray(programLight.vertexNormalAttribute);
 
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                */
+                
             }
 
             //Draw Scene From Camera
@@ -763,6 +784,10 @@ var defLight
 
                 if(load_items == 0)
                 {
+                    gl.useProgram(cameraShaderProgram);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, lightDepthTexture);
+
                     for(i in SceneGameObjects)
                     {
                         var go = SceneGameObjects[i];
@@ -790,7 +815,17 @@ var defLight
                                 gl.uniform1f(cameraShaderProgram.shininess_Uniform, mat.shininess);
 
                                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh_toDraw.VertexIndexBuffer);
+
+                                if(go.mesh == "floor") {
+                                    gl.uniformMatrix4fv(cameraShaderProgram.lightMVMatrixUniform, false, lightViewMatrix);
+                                } else {
+                                    var lightMeshMVMatrix = mat4.create()
+                                    mat4.set(lightMeshMVMatrix, lightViewMatrix);
+                                    mat4.multiply(lightMeshMVMatrix, go.transform.modelMatrix);
+                                    gl.uniformMatrix4fv(cameraShaderProgram .lightMVMatrixUniform, false, lightMeshMVMatrix);
+                                }
                                 sendMatricesToShader();
+
                                 gl.drawElements(gl.TRIANGLES, mesh_toDraw.VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
                                 mvPopMatrix();
                                 mvPushMatrix();
@@ -909,13 +944,16 @@ var defLight
                 lastMouseX = newX;
                 lastMouseY = newY;
             }
-// #endregion
-//#region Main
-var canvas;
-var MeshesLoaded_HTMLEmement;
-var GameObjects_HTMLEmement;
-var MaterialsList_HTMLElement;
-var Lights_HTMLEmement;
+            // #endregion
+            //#region Main
+            var canvas;
+            var MeshesLoaded_HTMLEmement;
+            var GameObjects_HTMLEmement;
+            var MaterialsList_HTMLElement;
+            var Lights_HTMLEmement;
+
+            //scene variables
+            var sceneCenterZ;
             function renderingLoop(){
                 requestAnimationFrame(renderingLoop);
                 if(recalculate_camera){
@@ -953,22 +991,27 @@ var Lights_HTMLEmement;
                 //when drag scene blocked
                 //dragElement(MeshesLoaded_HTMLEmement);
                 //dragElement(GameObjects_HTMLEmement);
-
+                
+                
                 initGL(canvas);
+                
+                loadFloorModel("floor");
+
+                sceneCenterZ = -10;
                 initCameraShaders();
-                //initLightShaders();
-                initLights();
+                initLightShaders();
+
 
                 var mesh = "teapot";
                 var TRS = new transform();
-                TRS.position = [-5.0,0.0,-10.0];
+                TRS.position = [-5.0,0.0, sceneCenterZ];
                 TRS.scale = [0.25, 0.25, 0.25];
                 TRS.CalcualteModelMatrix();
                 AddGo("GO Teapot", TRS, mesh, "Copper");
                 loadModel("Assets/models/Teapot.json", mesh);
                 
                 TRS = new transform();
-                TRS.position = [5.0,-1.0,-10.0];
+                TRS.position = [5.0,-1.0, sceneCenterZ];
                 TRS.rotateVector = [1.0, 0.0, 0.0];
                 TRS.rotateAngle = -90;
                 TRS.scale = [3.0, 3.0, 3.0];
@@ -978,11 +1021,9 @@ var Lights_HTMLEmement;
                 loadModel("Assets/models/Laptop.json", mesh);
 
                 TRS = new transform();
-                TRS.position = [0.0,-1.5,-10.0];
+                TRS.position = [0.0,-1.5, sceneCenterZ];
                 TRS.CalcualteModelMatrix();
-                mesh = "floor";
-                AddGo("GO Floor", TRS, mesh, "WhitePlastic");
-                loadFloorModel(mesh);
+                AddGo("GO Floor", TRS, "floor", "WhitePlastic");
 
                 gl.clearColor(0.0, 0.0, 0.0, 1.0);
                 gl.enable(gl.DEPTH_TEST);
