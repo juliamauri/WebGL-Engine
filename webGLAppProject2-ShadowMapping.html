@@ -387,6 +387,9 @@ var lightViewMatrix;
                 createInput.addEventListener("change", function(){
                     defLight.position[0] = this.value;
                     gl.uniform3f(cameraShaderProgram .lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                    lightViewMatrix = mat4.create();
+                    mat4.lookAt(lightViewMatrix, defLight.position, [0, 0, sceneCenterZ], [1, 0, 0]);
+                    gl.uniformMatrix4fv(lightShaderProgram.mvMatrixUniform, false, lightViewMatrix);
                 });
                 inputContainer.innerHTML = "X: ";
                 inputContainer.appendChild(createInput);
@@ -400,6 +403,9 @@ var lightViewMatrix;
                 createInput.addEventListener("change", function(){
                     defLight.position[1] = this.value;
                     gl.uniform3f(cameraShaderProgram .lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                    lightViewMatrix = mat4.create();
+                    mat4.lookAt(lightViewMatrix, defLight.position, [0, 0, sceneCenterZ], [1, 0, 0]);
+                    gl.uniformMatrix4fv(lightShaderProgram.mvMatrixUniform, false, lightViewMatrix);
                 });
                 inputContainer.innerHTML = "Y: ";
                 inputContainer.appendChild(createInput);
@@ -413,6 +419,9 @@ var lightViewMatrix;
                 createInput.addEventListener("change", function(){
                     defLight.position[2] = this.value;
                     gl.uniform3f(cameraShaderProgram.lightPositionEye_Uniform, defLight.position[0], defLight.position[1], defLight.position[2]);
+                    lightViewMatrix = mat4.create();
+                    mat4.lookAt(lightViewMatrix, defLight.position, [0, 0, sceneCenterZ], [1, 0, 0]);
+                    gl.uniformMatrix4fv(lightShaderProgram.mvMatrixUniform, false, lightViewMatrix);
                 });
                 inputContainer.innerHTML = "Z: ";
                 inputContainer.appendChild(createInput);
@@ -771,11 +780,36 @@ var lightViewMatrix;
 
 
                 // Rendering code
+                if(load_items == 0)
+                {
 
+                    for(i in SceneGameObjects)
+                    {
+                            var go = SceneGameObjects[i];
+                            if(go.mesh != "" && go.mesh != "floor"){
+                                var mesh_toDraw = MeshesLoaded[go.mesh];
+                                if(mesh_toDraw.VertexPositionBuffer)
+                                { 
+                                    gl.bindBuffer(gl.ARRAY_BUFFER, mesh_toDraw.VertexPositionBuffer);
+                                    gl.vertexAttribPointer(lightShaderProgram.vertexPositionAttribute, 
+                                                            mesh_toDraw.VertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+                                                                                            
+                                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh_toDraw.VertexIndexBuffer);
+
+                                    var lightMeshMVMatrix = mat4.create()
+                                    mat4.set(lightMeshMVMatrix, lightViewMatrix);
+                                    mat4.multiply(lightMeshMVMatrix, go.transform.modelMatrix);
+                                    gl.uniformMatrix4fv(lightShaderProgram.mvMatrixUniform, false, lightMeshMVMatrix);
+
+                                    gl.drawElements(gl.TRIANGLES, mesh_toDraw.VertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+                                }
+                            }
+                    }
+                }
 
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                
             }
+            
 
             //Draw Scene From Camera
             function drawSceneFromCamera() {
