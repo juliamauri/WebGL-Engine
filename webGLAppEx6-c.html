@@ -6,7 +6,7 @@
         <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
         <script type="text/javascript" src="webgl-utils.js"></script>
         <script type="text/javascript" src="ObjectScripts/Materials.js"></script>
-        <script type="text/javascript" src="ObjectScripts/Light.js"></script>
+        <script type="text/javascript" src="ObjectScripts/Lights.js"></script>
         <script type="text/javascript" src="ObjectScripts/Transform.js"></script>
         <script type="text/javascript" src="ObjectScripts/ResourceMesh.js"></script>
         <script type="text/javascript" src="ObjectScripts/GameObject.js"></script>
@@ -210,9 +210,9 @@
 //#region Lights
 var defLight
             function initLights(){
-                defLight = new light();
+                defLight = new DirLight();
                 defLight.material = MaterialsLoaded["WhitePlastic"];
-                defLight.position = [ 1.0, 0.5, 0.0 ];
+                defLight.direction = [ 1.0, 0.5, 0.0 ];
 
 //#region Lights HTTML Content
                 var content_light = document.createElement("div");
